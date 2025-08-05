@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, text
 from sqlalchemy.types import TIMESTAMP
-from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from core.database import Base
 
 class Users(Base):
@@ -11,3 +11,5 @@ class Users(Base):
     user_password = Column(String, nullable=False)
     user_name = Column(String, nullable=False)
     signup_date = Column(TIMESTAMP, nullable=False, server_default=text('now()'))
+    
+    services = relationship('Services', back_populates='owner')

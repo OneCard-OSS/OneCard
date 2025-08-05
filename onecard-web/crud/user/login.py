@@ -13,21 +13,28 @@ from core.redis import redis_config
 rd = redis_config()
 
 def getUserInfo(user_id:str, db:Session):
-    '''
-    ID Lookup
-    '''
+    """
+    Retrieve User Information using user_id
+    Args:
+    - user_id : User's ID
+    - db: ORM Session
+    Returns:
+    - Users | None
+    """
     return db.query(Users).filter(Users.user_id==user_id).first()
 
 def login(request: LoginRequest,
           token: Optional[str],
           db: Session):
-    '''
-    WebPage Login
-    params:
+    """
+    Admin Web Login Function
+    Args:
     - request: Login DTO
     - token: access token
     - db: ORM Session
-    '''
+    Returns:
+    - dict: status, token, token type, message
+    """
     if token:
         if rd.get(f"blacklist:{token}"):
             raise HTTPException(
@@ -63,6 +70,14 @@ def login(request: LoginRequest,
         }
     
 def logout(token:str):
+    """
+    Admin Web logout
+    access token blacklist
+    Args:
+    - token: access token
+    Returns:
+    - None
+    """
     try:
         payload = token_handler.verify_token(token=token, is_refresh=False)
         exp = payload.get("exp")
@@ -78,6 +93,15 @@ def logout(token:str):
         raise e
     
 def issuedRefreshToken(token:str):
+    """
+    Admin Web Issued Refresh Token
+    
+    Args:
+    - token: refresh token
+    
+    Returns:
+    - dict: access token, token type, expire time, message
+    """
     payload = token_handler.verify_token(token=token, is_refresh=True)
     id = payload.get("sub")
     print(f"User ID:{id}")
