@@ -1,0 +1,72 @@
+name: Deploy to 247 Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'onecard-web/**' # onecard-web 디렉토리의 변경이 있을 때만 실행
+      - 'onecard-api/**' # onecard-api 디렉토리의 변경이 있을 때만 실행
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - name: onecard-web
+            path: onecard-web
+            host_port: 8000
+            container_port: 9413
+            env_file: onecard-web/.env
+          - name: onecard-api
+            path: onecard-api
+            host_port: 8001
+            container_port: 8080
+            env_file: onecard-api/.env
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy .env file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: ${{ matrix.env_file }} 
+          target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
+
+      - name: Deploy to Remote Server
+        run: |
+          ssh ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
+            set -e
+            
+            cd /home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}
+            git pull origin main
+
+            echo "Building Docker Image for ${{ matrix.name }}..."
+            docker build -t ${{ matrix.name }} .
+
+            echo "Removing old container if exists..."
+            docker stop ${{ matrix.name }} || true
+            docker rm ${{ matrix.name }} || true
+
+            echo "Running new container for ${{ matrix.name }}..."
+            docker run -d \
+              --name ${{ matrix.name }} \
+              --network bridge \
+              --env-file .env \
+              -p ${{ matrix.host_port }}:${{ matrix.container_port }} \
+              ${{ matrix.name }}
+          EOF
