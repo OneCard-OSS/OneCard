@@ -37,21 +37,21 @@ jobs:
           echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Create and Copy .env file
-        id: scp_env
+      # --- 여기서부터 수정된 부분입니다 ---
+
+      - name: Create .env file from secrets
+        run: |
+          # matrix.env_secret에 해당하는 시크릿 값을 .env 파일로 생성
+          echo "${{ secrets[matrix.env_secret] }}" > ${{ matrix.path }}/.env
+
+      - name: Copy .env file to remote
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key_path: ~/.ssh/id_rsa  # key_path 사용
+          key_path: ~/.ssh/id_rsa
           source: ${{ matrix.path }}/.env
           target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
-        env:
-          # .env 파일 내용을 동적으로 생성하기 위한 임시 환경변수
-          ENV_CONTENT: ${{ secrets[matrix.env_secret] }}
-        # 액션 실행 전 .env 파일을 생성
-        run: |
-          echo "$ENV_CONTENT" > ${{ matrix.path }}/.env
 
       - name: Deploy to Remote Server
         run: |
@@ -59,7 +59,7 @@ jobs:
             set -e
             
             cd /home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}
-            git pull origin main
+            git pull origin main --rebase
             
             echo "Building Docker Image for ${{ matrix.name }}..."
             docker build -t ${{ matrix.name }} .
