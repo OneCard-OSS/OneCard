@@ -20,33 +20,38 @@ jobs:
             path: onecard-web
             host_port: 8000
             container_port: 9413
-            env_file: onecard-web/.env
+            env_secret: ENV_FILE_WEB
           - name: onecard-api
             path: onecard-api
             host_port: 8001
             container_port: 8080
-            env_file: onecard-api/.env
+            env_secret: ENV_FILE_API
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Create .env file for ${{ matrix.name }}
+      - name: Setup SSH Key
         run: |
-          if [ "${{ matrix.name }}" == "onecard-web" ]; then
-            echo "${{ secrets.ENV_FILE_WEB }}" > ${{ matrix.env_file }}
-          elif [ "${{ matrix.name }}" == "onecard-api" ]; then
-            echo "${{ secrets.ENV_FILE_API }}" > ${{ matrix.env_file }}
-          fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-      - name: Copy .env file
+      - name: Create and Copy .env file
+        id: scp_env
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: ${{ matrix.env_file }}
+          key_path: ~/.ssh/id_rsa  # key_path 사용
+          source: ${{ matrix.path }}/.env
           target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
+        env:
+          # .env 파일 내용을 동적으로 생성하기 위한 임시 환경변수
+          ENV_CONTENT: ${{ secrets[matrix.env_secret] }}
+        # 액션 실행 전 .env 파일을 생성
+        run: |
+          echo "$ENV_CONTENT" > ${{ matrix.path }}/.env
 
       - name: Deploy to Remote Server
         run: |
