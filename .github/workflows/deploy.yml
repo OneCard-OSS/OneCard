@@ -45,8 +45,10 @@ jobs:
         run: |
           scp -i "${{ github.workspace }}/ssh_keys/id_rsa" \
               -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
               "${{ github.workspace }}/${{ matrix.path }}/.env" \
               ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/
+
 
       - name: Deploy to Remote Server
         run: |
