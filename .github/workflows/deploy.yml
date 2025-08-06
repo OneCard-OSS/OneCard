@@ -18,8 +18,8 @@ jobs:
         include:
           - name: onecard-web
             path: onecard-web
-            host_port: 8000
-            container_port: 9413
+            host_port: 9413
+            container_port: 8000
             env_secret: ENV_FILE_WEB
           # - name: onecard-api
           #   path: onecard-api
