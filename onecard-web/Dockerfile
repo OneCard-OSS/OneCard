@@ -2,12 +2,9 @@ FROM python:3.12
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+COPY ./requirements.txt .
 
-COPY ./pyproject.toml .
-COPY ./uv.lock .
-
-RUN uv sync --no-dev --verbose
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . . 
 
