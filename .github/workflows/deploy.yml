@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p "${{ github.workspace }}/ssh_keys"
           echo "${{ secrets.SERVER_SSH_KEY }}" | tee "${{ github.workspace }}/ssh_keys/id_rsa" > /dev/null
-          chmod 600 "${{ github.workspace }}/ssh_keys/id_rsa"
+          chmod 644 "${{ github.workspace }}/ssh_keys/id_rsa"
 
       - name: Create .env file from secrets
         run: |
