@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - 'onecard-web/**' # onecard-web 디렉토리의 변경이 있을 때만 실행
-      - 'onecard-api/**' # onecard-api 디렉토리의 변경이 있을 때만 실행
+      - 'onecard-web/**'
+      - 'onecard-api/**'
 
 jobs:
   deploy:
     name: Deploy ${{ matrix.name }}
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         include:
@@ -26,7 +26,7 @@ jobs:
             host_port: 8001
             container_port: 8080
             env_file: onecard-api/.env
-
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -44,7 +44,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: ${{ matrix.env_file }} 
+          source: ${{ matrix.env_file }}
           target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
 
       - name: Deploy to Remote Server
@@ -54,14 +54,14 @@ jobs:
             
             cd /home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}
             git pull origin main
-
+            
             echo "Building Docker Image for ${{ matrix.name }}..."
             docker build -t ${{ matrix.name }} .
-
+            
             echo "Removing old container if exists..."
             docker stop ${{ matrix.name }} || true
             docker rm ${{ matrix.name }} || true
-
+            
             echo "Running new container for ${{ matrix.name }}..."
             docker run -d \
               --name ${{ matrix.name }} \
