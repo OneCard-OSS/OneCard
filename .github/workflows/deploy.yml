@@ -42,15 +42,12 @@ jobs:
           echo "${{ secrets[matrix.env_secret] }}" > ${{ matrix.path }}/.env
 
       - name: Copy .env file to remote
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key_path: ${{ github.workspace }}/ssh_keys/id_rsa
-          source: ${{ matrix.path }}/.env
-          target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
-          timeout: "60s"
-          
+        run: |
+          scp -i "${{ github.workspace }}/ssh_keys/id_rsa" \
+              -o StrictHostKeyChecking=no \
+              "${{ github.workspace }}/${{ matrix.path }}/.env" \
+              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/
+
       - name: Deploy to Remote Server
         run: |
           ssh -i "${{ github.workspace }}/ssh_keys/id_rsa" -o StrictHostKeyChecking=no ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
