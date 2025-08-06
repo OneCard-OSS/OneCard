@@ -9,7 +9,7 @@ COPY ./uv.lock .
 
 RUN uv sync --no-dev --verbose
 
-COPY . .
+COPY . . 
 
 EXPOSE 9413
 
