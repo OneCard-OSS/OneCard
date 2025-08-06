@@ -76,7 +76,7 @@ def logout(token:str):
     Args:
     - token: access token
     Returns:
-    - None
+    - dict: message
     """
     try:
         payload = token_handler.verify_token(token=token, is_refresh=False)
@@ -87,6 +87,7 @@ def logout(token:str):
         if ttl > 0:
             rd.setex(f"blacklist:{token}", ttl, "true") # true: Blacklisted
         rd.delete(f"refresh_token:{id}")
+        return {"message" : "Logout successful"}
     except HTTPException as he:
         logging.error(f"Error Occured:{he}")
     except Exception as e:

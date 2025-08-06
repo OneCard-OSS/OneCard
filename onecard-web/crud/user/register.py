@@ -10,7 +10,7 @@ def register_user(new_user:JoinUser, db:Session) -> Users:
     try:
         # Check if User ID Exists
         if db.query(Users).filter(Users.user_id == new_user.user_id).first():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+            raise HTTPException(status_code=409,
                                 detail="User ID already exists")
             
         hashed_password = bcrypt_context.hash(new_user.user_password)
