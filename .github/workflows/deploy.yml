@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     name: Deploy ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted 
 
     strategy:
       matrix:
@@ -31,45 +31,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup SSH Key
-        run: |
-          mkdir -p "${{ github.workspace }}/ssh_keys"
-          echo "${{ secrets.SERVER_SSH_KEY }}" | tee "${{ github.workspace }}/ssh_keys/id_rsa" > /dev/null
-          chmod 644 "${{ github.workspace }}/ssh_keys/id_rsa"
-
       - name: Create .env file from secrets
         run: |
           echo "${{ secrets[matrix.env_secret] }}" > ${{ matrix.path }}/.env
 
-      - name: Copy .env file to remote
-        run: |
-          scp -i "${{ github.workspace }}/ssh_keys/id_rsa" \
-              -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=30 \
-              "${{ github.workspace }}/${{ matrix.path }}/.env" \
-              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/
-
-
       - name: Deploy to Remote Server
         run: |
-          ssh -i "${{ github.workspace }}/ssh_keys/id_rsa" -o StrictHostKeyChecking=no ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
-            
-            cd /home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}
-            git pull origin main --rebase
-            
-            echo "Building Docker Image for ${{ matrix.name }}..."
-            docker build -t ${{ matrix.name }} .
-            
-            echo "Removing old container if exists..."
-            docker stop ${{ matrix.name }} || true
-            docker rm ${{ matrix.name }} || true
-            
-            echo "Running new container for ${{ matrix.name }}..."
-            docker run -d \
-              --name ${{ matrix.name }} \
-              --network bridge \
-              --env-file .env \
-              -p ${{ matrix.host_port }}:${{ matrix.container_port }} \
-              ${{ matrix.name }}
-          EOF
+          set -e
+          
+          cd /home/ubuntu/OSS-onecard/${{ matrix.path }} 
+          
+          git pull origin main --rebase
+          
+          echo "Building Docker Image for ${{ matrix.name }}..."
+          docker build -t ${{ matrix.name }} .
+          
+          echo "Removing old container if exists..."
+          docker stop ${{ matrix.name }} || true
+          docker rm ${{ matrix.name }} || true
+          
+          echo "Running new container for ${{ matrix.name }}..."
+          docker run -d \
+            --name ${{ matrix.name }} \
+            --network bridge \
+            --env-file .env \
+            -p ${{ matrix.host_port }}:${{ matrix.container_port }} \
+            ${{ matrix.name }}
