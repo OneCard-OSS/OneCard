@@ -49,7 +49,8 @@ jobs:
           key_path: ${{ github.workspace }}/ssh_keys/id_rsa
           source: ${{ matrix.path }}/.env
           target: "/home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}/"
-
+          timeout: 60
+          
       - name: Deploy to Remote Server
         run: |
           ssh -i "${{ github.workspace }}/ssh_keys/id_rsa" -o StrictHostKeyChecking=no ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
