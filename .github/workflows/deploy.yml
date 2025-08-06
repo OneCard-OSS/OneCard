@@ -33,7 +33,7 @@ jobs:
 
       - name: Create .env file for ${{ matrix.name }}
         run: |
-          if [ "${{ matrix.name }" == "onecard-web" ]; then
+          if [ "${{ matrix.name }}" == "onecard-web" ]; then
             echo "${{ secrets.ENV_FILE_WEB }}" > ${{ matrix.env_file }}
           elif [ "${{ matrix.name }}" == "onecard-api" ]; then
             echo "${{ secrets.ENV_FILE_API }}" > ${{ matrix.env_file }}
