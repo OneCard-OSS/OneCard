@@ -31,13 +31,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
       - name: Copy .env file
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -49,7 +42,7 @@ jobs:
 
       - name: Deploy to Remote Server
         run: |
-          ssh ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{secrets.SERVER_USER}}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
             
             cd /home/${{ secrets.SERVER_USER }}/OSS-onecard/${{ matrix.path }}
