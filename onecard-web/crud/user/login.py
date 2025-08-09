@@ -1,4 +1,4 @@
-from fastapi import status, HTTPException, Response
+from fastapi import status, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 from jose import JWTError
@@ -29,8 +29,8 @@ def login(request: LoginRequest,
     """
     Admin Web Login Function
     Args:
-    - request: Login DTO
-    - token: access token
+    - request: DTO containing information required for login
+    - token: access token - checking for blacklist
     - db: ORM Session
     Returns:
     - dict: status, token, token type, message
@@ -65,18 +65,18 @@ def login(request: LoginRequest,
     return {
         "status" : status.HTTP_200_OK,
         "access_token": access_token, 
+        "refresh_token" : refresh_token,
         "token_type": "bearer",
         "message" : "Login Success"
         }
     
 def logout(token:str):
     """
-    Admin Web logout
-    access token blacklist
+    This is a function that processes the blacklist when logging out.
     Args:
     - token: access token
     Returns:
-    - dict: message
+    - dict: Confirmation message indicating success
     """
     try:
         payload = token_handler.verify_token(token=token, is_refresh=False)
@@ -105,10 +105,8 @@ def issuedRefreshToken(token:str):
     """
     payload = token_handler.verify_token(token=token, is_refresh=True)
     id = payload.get("sub")
-    print(f"User ID:{id}")
     
     stored_refresh_token = rd.get(f"refresh_token:{id}")
-    print(f"Refresh Token:{stored_refresh_token}")
     
     try:
         if not stored_refresh_token:
