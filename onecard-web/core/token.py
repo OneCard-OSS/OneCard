@@ -22,7 +22,7 @@ class Token:
         else:
             expire  = datetime.datetime.now() + datetime.timedelta(minutes=self.AT_EXPIRE_MINUTES)
         
-        to_encode.update({"exp":expire})
+        to_encode.update({"exp":int(expire.timestamp())})
         return jwt.encode(to_encode, self.ACCESS_SECRET_KEY, algorithm=self.ALGORITHM)
     
     def create_refresh_token(self, data:dict):
