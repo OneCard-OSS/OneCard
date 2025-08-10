@@ -30,10 +30,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-
-      - name: Create .env file from secrets
+      
+      - name: Copy project files to target directory
         run: |
           mkdir -p /home/ubuntu//OSS-onecard/${{ matrix.path }}
+          cp -R ${{ github.workspace }}/${{ matrix.path }}/. /home/ubuntu/OSS-onecard/${{ matrix.path }}
+      
+      - name: Create .env file from secrets
+        run: |
           echo "${{ secrets[matrix.env_secret] }}" > /home/ubuntu/OSS-onecard/${{ matrix.path }}/.env
 
       - name: Deploy to Remote Server
