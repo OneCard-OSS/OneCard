@@ -11,7 +11,7 @@ class Token:
         self.REFRESH_SECRET_KEY = os.getenv("REFRESH_SECRET_KEY")
         self.ALGORITHM = os.getenv("ALGORITHM")
         self.AT_EXPIRE_MINUTES = int(os.getenv("AT_EXPIRE_MINUTES"))
-        self.RT_EXPIRE_DAYS = int(os.getenv("RT_EXPIRE_DAYS"))
+        self.RT_EXPIRE_MINUTES = int(os.getenv("RT_EXPIRE_MINUTES"))
     
     def create_access_token(self,
                             data:dict,
@@ -25,3 +25,10 @@ class Token:
         
         to_encode.update({"exp":int(expire.timestamp())})
         return jwt.encode(to_encode, self.ACCESS_SECRET_KEY, algorithm=self.ALGORITHM)
+    
+    def create_refresh_token(self,
+                             data:dict):
+        to_encode = data.copy()
+        expire = datetime.datetime.now() + datetime.timedelta(minutes=self.RT_EXPIRE_MINUTES)
+        to_encode.update({"exp":expire})
+        return jwt.encode(to_encode, self.REFRESH_SECRET_KEY, algorithm=self.ALGORITHM)
