@@ -18,7 +18,7 @@ def get_authorization(response_type:str,
                       redirect_uri:str,
                       state:Optional[str],
                       attempt_id:Optional[str],
-                      db:Session,):
+                      db:Session):
     """
     
     Args:
