@@ -31,18 +31,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
-      - name: Copy project files to target directory
-        run: |
-          # /home/ubuntu/OSS-onecard/ 디렉토리를 통째로 동기화
-          rm -rf /home/ubuntu/OSS-onecard/
-          rsync -av --delete --exclude '.git' \
-            ${{ github.workspace }}/ \
-            /home/ubuntu/OSS-onecard/
-      
-      - name: Create .env file from secrets
-        run: |
-          echo "${{ secrets[matrix.env_secret] }}" > /home/ubuntu/OSS-onecard/${{ matrix.path }}/.env
-
       - name: Deploy to Remote Server
         run: |
           set -e
@@ -54,6 +42,8 @@ jobs:
           
           git pull origin main
           
+          echo "${{ secrets[matrix.env_secret] }}" > ${{ matrix.path }}/.env
+
           cd ${{ matrix.path }}
           
           echo "Building Docker Image for ${{ matrix.name }}..."
