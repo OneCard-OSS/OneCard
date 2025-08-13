@@ -44,8 +44,10 @@ jobs:
         run: |
           set -e
           
-          cd /home/ubuntu/OSS-onecard/${{ matrix.path }} 
-          
+          cd /home/ubuntu/OSS-onecard/${{ matrix.path }}
+           
+          git reset --hard
+          git clean -fdx
           git pull origin main --rebase
           
           echo "Building Docker Image for ${{ matrix.name }}..."
