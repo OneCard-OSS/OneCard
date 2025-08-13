@@ -4,7 +4,6 @@ from core.redis import redis_config
 from core.conn_noti_server import notification_server_communication
 from models.service import Services, RedirectUris
 from models.employee import Employee
-from schemas.login import InitLoginRequest
 from utils.redis_const import REDIS_AUTH_ATTEMPT_PREFIX
 import logging
 import uuid
