@@ -4,6 +4,7 @@ from core.redis import redis_config
 from core.conn_noti_server import notification_server_communication
 from models.service import Services, RedirectUris
 from models.employee import Employee
+from schemas.login import InitLoginRequest
 from utils.redis_const import REDIS_AUTH_ATTEMPT_PREFIX
 import logging
 import uuid
@@ -12,8 +13,8 @@ import json
 
 rd = redis_config()
 
-def init_login(client_id:str,
-               emp_no:str,
+async def init_login(emp_no:str,
+               client_id:str,
                redirect_uri:str,
                db:Session):
     """
@@ -56,7 +57,7 @@ def init_login(client_id:str,
     attempt_redis_key = f"{REDIS_AUTH_ATTEMPT_PREFIX}{attempt_id}"
     rd.setex(attempt_redis_key, attempt_ttl, json.dumps(attempt_state))
     
-    noti_data = notification_server_communication(attempt_id=attempt_id,
+    noti_data = await notification_server_communication(attempt_id=attempt_id,
                                                   emp_no=emp_no, 
                                                   client_id=client_id,
                                                   challenge=new_attempt_challenge)
