@@ -4,6 +4,12 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import TIMESTAMP
 from core.database import Base
 
+class Users(Base):
+    __tablename__ = 'users'
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    
+    services = relationship("Services", back_populates="owner")
+    
 class Services(Base):
     __tablename__ = 'services'
 

@@ -1,9 +1,7 @@
 from sqlalchemy import Column, String, Date
+from sqlalchemy.orm import relationship
 from core.database import Base
 
-"""
-This schema is dummy schema 
-"""
 class Employee(Base):
     __tablename__ = "employee"
     
@@ -14,3 +12,5 @@ class Employee(Base):
     department = Column(String, nullable=False)
     birth = Column(Date, nullable=False)
     email = Column(String, nullable=False)
+    
+    pubkeys = relationship("Pubkey", back_populates="employee", cascade="all, delete")
