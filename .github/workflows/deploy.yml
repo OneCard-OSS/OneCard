@@ -33,13 +33,11 @@ jobs:
       
       - name: Copy project files to target directory
         run: |
-          rm -rf /home/ubuntu/OSS-onecard/${{ matrix.path }}
-          
-          mkdir -p /home/ubuntu//OSS-onecard/${{ matrix.path }}
-          
+          # /home/ubuntu/OSS-onecard/ 디렉토리를 통째로 동기화
+          rm -rf /home/ubuntu/OSS-onecard/
           rsync -av --delete --exclude '.git' \
-          ${{ github.workspace }}/${{ matrix.path }}/ \
-          /home/ubuntu/OSS-onecard/${{ matrix.path }}/
+            ${{ github.workspace }}/ \
+            /home/ubuntu/OSS-onecard/
       
       - name: Create .env file from secrets
         run: |
@@ -49,7 +47,12 @@ jobs:
         run: |
           set -e
           
-          cd /home/ubuntu/OSS-onecard/${{ matrix.path }}
+          # Git pull은 Git 저장소 루트(/home/ubuntu/OSS-onecard/)에서 실행
+          cd /home/ubuntu/OSS-onecard/
+          git pull origin main
+          
+          # Docker 빌드는 프로젝트 디렉토리(/home/ubuntu/OSS-onecard/onecard-web/)에서 실행
+          cd ${{ matrix.path }}
           
           echo "Building Docker Image for ${{ matrix.name }}..."
           docker build -t ${{ matrix.name }} .
