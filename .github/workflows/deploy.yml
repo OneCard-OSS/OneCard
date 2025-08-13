@@ -31,20 +31,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
       
+      - name: Sync project files to target directory
+        run: |
+
+          rsync -av --delete --exclude '.git' \
+            ${{ github.workspace }}/ \
+            /home/ubuntu/OSS-onecard/
+      
+      - name: Create .env file from secrets
+        run: |
+          echo "${{ secrets[matrix.env_secret] }}" > /home/ubuntu/OSS-onecard/${{ matrix.path }}/.env
+
       - name: Deploy to Remote Server
         run: |
           set -e
-          
-          cd /home/ubuntu/OSS-onecard/
 
-          git clean -df
-          git reset --hard
-          
-          git pull origin main
-          
-          echo "${{ secrets[matrix.env_secret] }}" > ${{ matrix.path }}/.env
-
-          cd ${{ matrix.path }}
+          cd /home/ubuntu/OSS-onecard/${{ matrix.path }}
           
           echo "Building Docker Image for ${{ matrix.name }}..."
           docker build -t ${{ matrix.name }} .
