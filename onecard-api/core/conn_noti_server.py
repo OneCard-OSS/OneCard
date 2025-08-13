@@ -2,12 +2,18 @@ import os
 import httpx
 import logging
 
-def notification_server_communication(attempt_id:str,
+async def notification_server_communication(attempt_id:str,
                                       emp_no:str,
                                       client_id:str,
                                       challenge:str):
     """
-    - attempt_id: 시도아이디
+    Args:
+    - attempt_id:  attempt identification ID
+    - emp_no: employee identification number
+    - client_id: 
+    - challenge: 
+    Returns:
+    - 
     """
     url = str(os.getenv("PUSH_SERVER_URL"))
     headers = {
@@ -24,10 +30,11 @@ def notification_server_communication(attempt_id:str,
         "status" : 200
     }
     try:
-        response = httpx.post(url=url,
-                              headers=headers,
-                              json=data,
-                              timeout=5.0)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url=url,
+                                         headers=headers,
+                                         json=data,
+                                         timeout=5.0)
         response.raise_for_status() 
         
         return response.json()
