@@ -33,8 +33,13 @@ jobs:
       
       - name: Copy project files to target directory
         run: |
+          rm -rf /home/ubuntu/OSS-onecard/${{ matrix.path }}
+          
           mkdir -p /home/ubuntu//OSS-onecard/${{ matrix.path }}
-          cp -R ${{ github.workspace }}/${{ matrix.path }}/. /home/ubuntu/OSS-onecard/${{ matrix.path }}
+          
+          rsync -av --delete --exclude '.git' \
+          ${{ github.workspace }}/${{ matrix.path }}/ \
+          /home/ubuntu/OSS-onecard/${{ matrix.path }}/
       
       - name: Create .env file from secrets
         run: |
@@ -45,10 +50,6 @@ jobs:
           set -e
           
           cd /home/ubuntu/OSS-onecard/${{ matrix.path }}
-           
-          git reset --hard
-          git clean -fdx
-          git pull origin main --rebase
           
           echo "Building Docker Image for ${{ matrix.name }}..."
           docker build -t ${{ matrix.name }} .
