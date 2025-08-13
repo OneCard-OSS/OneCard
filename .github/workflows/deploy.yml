@@ -47,11 +47,13 @@ jobs:
         run: |
           set -e
           
-          # Git pull은 Git 저장소 루트(/home/ubuntu/OSS-onecard/)에서 실행
           cd /home/ubuntu/OSS-onecard/
+
+          git clean -df
+          git reset --hard
+          
           git pull origin main
           
-          # Docker 빌드는 프로젝트 디렉토리(/home/ubuntu/OSS-onecard/onecard-web/)에서 실행
           cd ${{ matrix.path }}
           
           echo "Building Docker Image for ${{ matrix.name }}..."
