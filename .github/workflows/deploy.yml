@@ -55,10 +55,12 @@ jobs:
           docker stop ${{ matrix.name }} || true
           docker rm ${{ matrix.name }} || true
           
+          docker network create onecard-net || true
+
           echo "Running new container for ${{ matrix.name }}..."
           docker run -d \
             --name ${{ matrix.name }} \
-            --network bridge \
+            --network onecard-net \
             --env-file .env \
             -p ${{ matrix.host_port }}:${{ matrix.container_port }} \
             ${{ matrix.name }}
