@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from models.employee import Employee
 from models.service import Services
+from models.permission import permission_table
 
 def block_department_from_service(client_id: str, 
                                   department_name: str,
@@ -45,12 +46,27 @@ def unblock_department_from_service(client_id:str,
     if not employees_in_dept:
         raise PermissionError(f"No employees found in department '{department_name}'.")
 
-    for employee in employees_in_dept:
-        if employee in service.employees:
-            service.employees.remove(employee)
-            
-    db.commit()
+    emp_no_in_dept = [emp.emp_no for emp in employees_in_dept]
+    
+    if emp_no_in_dept:
+        # First, check if have permission to delete at least one
+        permission = db.query(permission_table).filter(
+            permission_table.c.service_id == service.id,
+            permission_table.c.emp_no._in_(emp_no_in_dept)
+        ).count()
+        if permission == 0:
+            raise PermissionError(
+                f"No blocked employees found in department:{department_name}"
+            )
+        perm = permission_table.delete().where(
+            permission_table.c.service_id == service.id,
+            permission_table.c.emp_no.in_(emp_no_in_dept)
+        ) 
+        result = db.execute(perm)
+        db.commit()
+        print(f"Success: Unblocked employees from department '{department_name}' for service '{service.name}'.")
+    else:
+        print(f"Info: No employees to unblock in department '{department_name}'.")         
     db.refresh(service)
-    print(f"Success: Unblocked employees from department '{department_name}' for service '{service.name}'.")
     
     return service
