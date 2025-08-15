@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 로그인</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-8">관리자 로그인</h2>
+        <form id="login-form">
+            <div class="mb-4">
+                <label for="username" class="block text-gray-700 text-sm font-bold mb-2">아이디</label>
+                <input type="text" id="username" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <div class="mb-6">
+                <label for="password" class="block text-gray-700 text-sm font-bold mb-2">비밀번호</label>
+                <input type="password" id="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <div class="flex items-center justify-between">
+                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition">
+                    로그인
+                </button>
+            </div>
+            <p id="error-message" class="text-red-500 text-xs italic mt-4 text-center"></p>
+        </form>
+    </div>
+
+<script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user_id = e.target.username.value;
+        const password = e.target.password.value;
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.textContent = '';
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id:user_id, user_password:password })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || '로그인에 실패했습니다.');
+            }
+
+            const data = await response.json();
+            // 토큰을 쿠키에 저장 (HttpOnly, Secure 속성은 실제 운영에서 백엔드가 설정)
+            document.cookie = `access_token=${data.access_token}; path=/; max-age=600;`;
+            document.cookie = `refresh_token=${data.refresh_token}; path=/; max-age=1209600;`;
+            
+            window.location.href = '/admin/services'; // 로그인 성공 시 서비스 관리 페이지로 이동
+
+        } catch (error) {
+            errorMessage.textContent = error.message;
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .nav-link {
+            padding: 1rem 1.5rem;
+            border-bottom: 4px solid transparent;
+            transition: all 0.3s;
+        }
+        .nav-link.active {
+            border-bottom-color: #3B82F6; /* blue-500 */
+            color: #3B82F6;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div class="flex flex-col min-h-screen">
+        <header class="bg-white shadow-md">
+            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-700">관리자 대시보드</h1>
+                <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">
+                    로그아웃
+                </button>
+            </div>
+            <nav class="bg-white">
+                <div class="container mx-auto px-6">
+                    <div class="flex">
+                        <a href="/admin/services" class="nav-link font-semibold text-gray-600 hover:text-blue-500 {% if active_tab == 'services' %}active{% endif %}">
+                            서비스 관리
+                        </a>
+                        <a href="/admin/logs" class="nav-link font-semibold text-gray-600 hover:text-blue-500 {% if active_tab == 'logs' %}active{% endif %}">
+                            로그 분석
+                        </a>
+                        <a href="/admin/permissions" class="nav-link font-semibold text-gray-600 hover:text-blue-500 {% if active_tab == 'permissions' %}active{% endif %}">
+                            권한 제어
+                        </a>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main class="flex-grow container mx-auto p-6">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+<script>
+    function getCookie(name) {
+        return document.cookie.split('; ').find(row => row.startsWith(name + '='))?.split('=')[1];
+    }
+    async function fetchWithAuth(url, options={}) {
+        let accessToken = getCookie('access_token')
+        options.headers = {...options.headers, 'Authorization' : `Bearer ${accessToken}`};
+
+        let response = await fetch(url, options);
+        if (response.status === 401) {
+            const refreshToken = getCookie('refresh_token');
+            if (!refreshToken) {
+                alert('세션이 만료되었습니다. 다시 로그인해주세요.')
+                window.location.href = '/admin/login';
+                throw new Error('No research token found')
+            }
+            try {
+                const refreshResponse = await fetch('/api/token', {
+                    method:'POST',
+                    headers: {'Authorization' : `Bearer ${refreshToken}`}
+                });
+                if (!refreshResponse.ok) {
+                    throw new Error('Failed to refresh token')
+                }
+                const newTokens = await refreshResponse.json()
+                document.cookie = `access_token=${newTokens.access_token}; path=/; max-age=${newTokens.expires_in};`;
+                console.log('Token refreshed successfully. Retrying original request...');
+                options.headers['Authorization'] = `Bearer ${newTokens.access_token}`;
+                response = await fetch(url,options);
+            } catch (refreshError) {
+                document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                alert('세션 갱신에 실패했습니다.')
+                window.location.href = '/admin/login';
+                throw refreshError;
+            }
+        }
+        return response
+    } 
+    // 로그아웃 처리
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        const token = getCookie('access_token');
+        if (token) {
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+        // 쿠키 삭제 및 로그인 페이지로 리디렉션
+        document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        window.location.href = '/admin/login';
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- 직원 단위 제어 -->
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-bold mb-4">직원 단위 접근 제어</h2>
+        <form id="employee-permission-form">
+            <div class="mb-4">
+                <label for="emp-service-client-id" class="block text-sm font-medium text-gray-700">서비스 Client ID</label>
+                <input type="text" id="emp-service-client-id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+            </div>
+            <div class="mb-4">
+                <label for="emp-no" class="block text-sm font-medium text-gray-700">사원 번호</label>
+                <input type="text" id="emp-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+            </div>
+            <div class="flex gap-4">
+                <button type="button" id="block-emp-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">접근 차단</button>
+                <button type="button" id="unblock-emp-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition">차단 해제</button>
+            </div>
+        </form>
+    </div>
+    <!-- 부서 단위 제어 -->
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-bold mb-4">부서 단위 접근 제어</h2>
+        <form id="department-permission-form">
+            <div class="mb-4">
+                <label for="dept-service-client-id" class="block text-sm font-medium text-gray-700">서비스 Client ID</label>
+                <input type="text" id="dept-service-client-id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+            </div>
+            <div class="mb-4">
+                <label for="department-name" class="block text-sm font-medium text-gray-700">부서명</label>
+                <input type="text" id="department-name" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+            </div>
+            <div class="flex gap-4">
+                <!-- [수정됨] 버튼 ID를 고유하게 변경 -->
+                <button type="button" id="block-dept-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">접근 차단</button>
+                <button type="button" id="unblock-dept-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition">차단 해제</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // --- 직원 단위 제어 ---
+    const empClientIdInput = document.getElementById('emp-service-client-id');
+    const empNoInput = document.getElementById('emp-no');
+
+    document.getElementById('block-emp-btn').addEventListener('click', () => handleEmployeePermission('/api/block/employee'));
+    document.getElementById('unblock-emp-btn').addEventListener('click', () => handleEmployeePermission('/api/unblock/employee'));
+
+    async function handleEmployeePermission(apiUrl) {
+        const clientId = empClientIdInput.value;
+        const empNo = empNoInput.value;
+        if (!clientId || !empNo) {
+            alert('서비스 Client ID와 사원 번호를 모두 입력해주세요.');
+            return;
+        }
+
+        try {
+            const response = await fetchWithAuth(apiUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ client_id: clientId, emp_no: empNo })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || '작업에 실패했습니다.');
+            alert(data.message);
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // --- 부서 단위 제어 ---
+    const deptClientIdInput = document.getElementById('dept-service-client-id');
+    const departmentNameInput = document.getElementById('department-name');
+
+    document.getElementById('block-dept-btn').addEventListener('click', () => handleDepartmentPermission('/api/block/dept'));
+    document.getElementById('unblock-dept-btn').addEventListener('click', () => handleDepartmentPermission('/api/unblock/dept'));
+
+    async function handleDepartmentPermission(apiUrl) {
+        const clientId = deptClientIdInput.value;
+        const department = departmentNameInput.value;
+        if (!clientId || !department) {
+            alert('서비스 Client ID와 부서명을 모두 입력해주세요.');
+            return;
+        }
+
+        try {
+            const response = await fetchWithAuth(apiUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ client_id: clientId, dept: department })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || '작업에 실패했습니다.');
+            alert(data.message);
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- 서비스 목록 -->
+    <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-bold mb-4">서비스 목록</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">서비스 이름</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">설명</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">관리</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for service in services %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ service.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ service.description }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="showServiceDetails('{{ service.name }}')" class="text-indigo-600 hover:text-indigo-900">상세보기</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 페이지네이션 UI -->
+        {% if total_pages > 1 %}
+        <div class="mt-6 flex justify-center items-center">
+            <a href="?page={{ current_page - 1 if current_page > 1 else 1 }}"
+               class="px-4 py-2 mx-1 text-gray-700 bg-white rounded-md border {% if current_page == 1 %}opacity-50 cursor-not-allowed{% endif %}">
+                &laquo; 이전
+            </a>
+            {% for page_num in range(1, total_pages + 1) %}
+                <a href="?page={{ page_num }}"
+                   class="px-4 py-2 mx-1 rounded-md border {% if page_num == current_page %}bg-blue-500 text-white{% else %}bg-white text-gray-700{% endif %}">
+                    {{ page_num }}
+                </a>
+            {% endfor %}
+            <a href="?page={{ current_page + 1 if current_page < total_pages else total_pages }}"
+               class="px-4 py-2 mx-1 text-gray-700 bg-white rounded-md border {% if current_page == total_pages %}opacity-50 cursor-not-allowed{% endif %}">
+                다음 &raquo;
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 신규 서비스 등록 -->
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-bold mb-4">신규 서비스 등록</h2>
+        <form id="register-service-form">
+             <div class="mb-4">
+                <label for="service-name" class="block text-sm font-medium text-gray-700">서비스 이름</label>
+                <input type="text" id="service-name" name="name" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div class="mb-4">
+                <label for="service-description" class="block text-sm font-medium text-gray-700">설명</label>
+                <textarea id="service-description" name="description" rows="3" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+            </div>
+            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition">등록하기</button>
+        </form>
+    </div>
+</div>
+
+<!-- 서비스 상세 정보 모달 -->
+<div id="service-details-modal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto p-6 relative">
+        <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+        <h2 id="modal-title" class="text-2xl font-bold mb-4"></h2>
+        <div class="space-y-4">
+            <div>
+                <h3 class="font-semibold">Registered Admininistrator</h3>
+                <p id="modal-owner-name" class="text-sm text-gray-600 bg-gray-100 p-2 rounded"></p>
+            </div>
+            <div>
+                <h3 class="font-semibold">Client ID</h3>
+                <p id="modal-client-id" class="text-sm text-gray-600 bg-gray-100 p-2 rounded"></p>
+            </div>
+            <div>
+                <h3 class="font-semibold">Client Secret</h3>
+                <p id="modal-client-secret" class="text-sm text-gray-600 bg-gray-100 p-2 rounded"></p>
+            </div>
+            <div>
+                <h3 class="font-semibold">Redirect URIs</h3>
+                <div id="modal-redirect-uris-container" class="space-y-2 text-sm text-gray-600 bg-gray-100 p-3 rounded min-h-[50px]">
+                    <!-- URI 목록이 여기에 동적으로 추가됩니다 -->
+                </div>
+            </div>
+            <!-- URI 추가 폼 -->
+            <form id="add-uri-form" class="mt-4">
+                <h3 class="font-semibold mb-2">Redirect URI 추가</h3>
+                <div class="flex items-center gap-2">
+                    <input type="url" id="new-uri-input" placeholder="https://example.com/callback" class="flex-grow mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition">추가</button>
+                </div>
+            </form>
+        </div>
+        <div class="mt-6 pt-4 border-t flex gap-4">
+            <button id="save-uris-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition">변경사항 저장</button>
+            <button id="delete-service-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">이 서비스 삭제</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('service-details-modal');
+    let currentClientId = null;
+
+    async function showServiceDetails(serviceName) {
+        try {
+            const apiUrl = `/api/services/${serviceName}`;
+            const response = await fetchWithAuth(apiUrl);
+            if (!response.ok) { 
+                throw new Error('서비스 정보를 불러오지 못했습니다.');
+            }
+            const data = await response.json();
+
+            currentClientId = data.client_id;
+            document.getElementById('modal-owner-name').textContent = data.owner;
+            document.getElementById('modal-title').textContent = data.name;
+            document.getElementById('modal-client-id').textContent = data.client_id;
+            document.getElementById('modal-client-secret').textContent = data.client_secret;
+            
+            renderUris(data.redirect_uris || []);
+            modal.classList.remove('hidden');
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function renderUris(uris) {
+        const uriContainer = document.getElementById('modal-redirect-uris-container');
+        uriContainer.innerHTML = '';
+        if (uris.length === 0) {
+            uriContainer.innerHTML = '<p class="text-gray-400">등록된 Redirect URI가 없습니다.</p>';
+            return;
+        }
+        uris.forEach(uriObj => {
+            const uriText = typeof uriObj === 'string' ? uriObj : uriObj.uris;
+            const uriElement = document.createElement('div');
+            uriElement.className = 'flex justify-between items-center p-1 bg-white rounded';
+            uriElement.dataset.uri = uriText;
+            uriElement.innerHTML = `
+                <span class="break-all">${uriText}</span>
+                <button onclick="this.parentElement.remove()" class="ml-2 text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>
+            `;
+            uriContainer.appendChild(uriElement);
+        });
+    }
+
+    document.getElementById('add-uri-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('new-uri-input');
+        const newUri = input.value.trim();
+        if (newUri) {
+            const existingUriElements = document.querySelectorAll('#modal-redirect-uris-container > div');
+            const currentUris = Array.from(existingUriElements).map(el => el.dataset.uri);
+            
+            if (currentUris.includes(newUri)) {
+                alert('이미 등록된 URI입니다.');
+                return;
+            }
+            
+            renderUris([...currentUris, newUri]);
+            input.value = '';
+        }
+    });
+
+    document.getElementById('save-uris-btn').addEventListener('click', async () => {
+        if (!currentClientId) return;
+
+        const uriElements = document.querySelectorAll('#modal-redirect-uris-container > div');
+        const urisToSave = Array.from(uriElements).map(el => el.dataset.uri);
+
+        try {
+            const response = await fetchWithAuth(`/api/services/redirect-uris/${currentClientId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json'},
+                body: JSON.stringify({ redirect_uris: urisToSave })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'URI 목록 저장에 실패했습니다.');
+            
+            alert(data.message);
+            closeModal();
+        } catch (error) {
+            alert(error.message);
+        }
+    });
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        currentClientId = null;
+    }
+
+    document.getElementById('register-service-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetchWithAuth('/api/services', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('서비스 등록에 실패했습니다.');
+            alert('서비스가 성공적으로 등록되었습니다.');
+            window.location.reload();
+        } catch (error) {
+            alert(error.message);
+        }
+    });
+    
+    document.getElementById('delete-service-btn').addEventListener('click', async () => {
+        if (!currentClientId) return;
+        if (!confirm(`정말로 이 서비스(${document.getElementById('modal-title').textContent})를 삭제하시겠습니까?`)) return;
+
+        try {
+            const response = await fetchWithAuth(`/api/services/${currentClientId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error('서비스 삭제에 실패했습니다.');
+            alert('서비스가 삭제되었습니다.');
+            window.location.reload();
+        } catch (error) {
+            alert(error.message);
+        }
+    });
+</script>
+{% endblock %}
