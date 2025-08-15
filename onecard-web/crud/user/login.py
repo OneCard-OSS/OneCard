@@ -67,6 +67,7 @@ def login(request: LoginRequest,
         "access_token": access_token, 
         "refresh_token" : refresh_token,
         "token_type": "bearer",
+        "expires_in" : token_handler.AT_EXPIRE_MINUTES,
         "message" : "Login Success"
         }
     
