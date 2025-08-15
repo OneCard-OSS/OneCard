@@ -2,15 +2,15 @@ from fastapi import FastAPI
 import uvicorn
 from api.v1.user import user_router
 from api.v1.service import service_router
+from api.v1.permission import perm_router
+from routers.routers import admin_router
 
 app = FastAPI()
 
-@app.get("/")
-def main():
-    return {"Message" : "Server Start"}
-
+app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(service_router)
+app.include_router(perm_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, 
