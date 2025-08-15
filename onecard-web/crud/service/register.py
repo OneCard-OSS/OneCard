@@ -62,11 +62,27 @@ def add_or_update_redirect_uris(client_id:str,
                             detail="Permission denied")
     
     db.query(RedirectUris).filter(RedirectUris.client_id == client_id).delete()
-    for uri in uris.redirect_uris:
+    
+    for uri in set(uris.redirect_uris):
         redirect_uri = RedirectUris(client_id=service.client_id,
                                     uris=str(uri))
         db.add(redirect_uri)
-    
     db.commit()
-    return {"message" : "Redirect URIs registered successfully"}
-        
+    return {"message" : f"Successfully added Redirect URIs"}
+    
+    # exisiting_uris = {uri.uris for uri in service.redirect_uris}
+    # new_uris_added = 0
+    # for uri in uris.redirect_uris:
+    #     uri_str = str(uri)
+    #     if uri_str not in exisiting_uris:
+    #         redirect_uri = RedirectUris(client_id=service.client_id,
+    #                                     uris=str(uri))
+    #         db.add(redirect_uri)
+    #         new_uris_added += 1
+    # if new_uris_added > 0:
+    #     db.commit()
+    #     return {"message" : f"Successfully added {new_uris_added} Redirect URIs"}
+    # else:
+    #     return {"message" : "No new URI to add or URI is already registered"}
+    
+    

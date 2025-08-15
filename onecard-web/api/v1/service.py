@@ -9,7 +9,7 @@ from schemas.service import RegisterService, AddRedirectUris, GetSerivceInfo
 
 service_router = APIRouter(prefix="/api", tags=["Related Register OneCard Service"])
 
-@service_router.get("/{service_name}", response_model=GetSerivceInfo)
+@service_router.get("/services/{service_name}", response_model=GetSerivceInfo)
 def get_servicee_info(service_name:str,
                       db:Session=Depends(get_db),
                       current_user=Depends(current_user_info)):
@@ -23,7 +23,7 @@ def register_service(service:RegisterService,
     
     return create_service(service=service, db=db, current_user=current_user)
 
-@service_router.post("/services/redirect-uris/{client_id}")
+@service_router.put("/services/redirect-uris/{client_id}")
 async def register_redirect_uris(client_id:str,
                            uris:AddRedirectUris,
                            request:Request,
