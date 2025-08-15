@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import TIMESTAMP
 from core.database import Base
+from models.permission import permission_table
 
 class Services(Base):
     __tablename__ = 'services'
@@ -17,6 +18,11 @@ class Services(Base):
 
     owner = relationship('Users', back_populates='services')
     redirect_uris = relationship("RedirectUris", back_populates="service", cascade="all, delete-orphan")
+    employees= relationship(
+        "Employee",
+        secondary=permission_table,
+        back_populates='services'
+    )
     
 class RedirectUris(Base):
     __tablename__ = "redirect_uris"
