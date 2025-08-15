@@ -1,11 +1,12 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError
 from core.redis import redis_config
 from core.token_instance import token_handler
 import logging
 
 rd = redis_config()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 def current_user_info(token:str=Depends(oauth2_scheme)):
     try:
@@ -17,9 +18,14 @@ def current_user_info(token:str=Depends(oauth2_scheme)):
         logging.debug(f"User ID:{id}")
         
         return {"id" : id}
+    except JWTError as je:
+        logging.warning(f"JWT validation failed:{je}")
+        raise HTTPException(status_code=401,
+                            detail="Could not validate credentials",
+                            headers={"WWW-Authenticate":"Bearer"})
     except HTTPException as he:
         raise he
     except Exception as e:
-        logging.error(str(e))
+        logging.error(str(e), exc_info=True)
         raise HTTPException(status_code=500,
                             detail="Error Occured while getting user info")
