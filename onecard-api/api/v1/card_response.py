@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from core.database import get_db
 from services.card_response import get_card_response
-from schemas.card import Card_data_with_attempt
+from schemas.card import CardDataRequest
 from logging import getLogger
 from logging_config import EndPointAdapter
 
 card_response_router = APIRouter(prefix="/api/v1", tags=["NFC tagging response"])
 
 @card_response_router.post("/card-response")
-def card_response(data:Card_data_with_attempt, 
+def card_response(data:CardDataRequest, 
                   client_id:str, 
                   db:Session=Depends(get_db)):
     
