@@ -23,9 +23,5 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
-        db.commit()
-    except exc.SQLAlchemyError as se:
-        db.rollback()
-        raise se
     finally:
         db.close()
