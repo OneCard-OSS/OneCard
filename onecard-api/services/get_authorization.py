@@ -7,7 +7,7 @@ from models.service import Services, RedirectUris
 from core.redis import redis_config
 from utils.redirect_error import redirect_with_oauth2_error
 from utils.redis_const import REDIS_AUTH_ATTEMPT_PREFIX, REDIS_AUTH_CODE_PREFIX
-import logging
+from logging import LoggerAdapter
 import uuid
 import json
 
@@ -18,7 +18,8 @@ def get_authorization(response_type:str,
                       redirect_uri:str,
                       state:Optional[str],
                       attempt_id:Optional[str],
-                      db:Session):
+                      db:Session,
+                      logger:LoggerAdapter):
     """
     
     Args:
@@ -43,13 +44,13 @@ def get_authorization(response_type:str,
             RedirectUris.uris == redirect_uri
         ).first()
     if not service:
-        logging.warning(f"Authorization failed: Invalid client_id or redirect_uri")
+        logger.warning(f"Authorization failed: Invalid client_id or redirect_uri")
         raise HTTPException(status_code=401,
                             detail="Invalid client_id or redirect_uri")
     
     # STEP 2. response_type Checking
     if response_type != "code":
-        logging.warning(f"[/authorization] failed: Invalid response_type:{response_type}")
+        logger.warning(f"Invalid response_type:{response_type}")
         return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                           status_code=400,
                                           detail="Invalid response type",
@@ -60,23 +61,23 @@ def get_authorization(response_type:str,
         attempt_state = rd.get(redis_attempt_key)
         
         if not attempt_state:
-            logging.warning(f"[/authorization] faild: Invalid or Expire attempt_id")
+            logger.warning(f"Invalid or Expire attempt_id")
             return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                               status_code=401,
                                               detail="Authentication attempt expired or invalid",
                                               state=state)
         try:
             attempt_state = json.loads(attempt_state.decode('utf-8'))
-            logging.debug(f"[/authorization] Retrived attempt_state:{attempt_state}")
+            logger.debug(f"Retrived attempt_state:{attempt_state}")
         except json.JSONDecodeError:
-            logging.warning(f"[/authorization] JSON decode error for {attempt_id}")
+            logger.warning(f"JSON decode error for {attempt_id}")
             return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                               status_code=500,
                                               detail="Internal auth state error",
                                               state=state)
             
         if attempt_state.get("status") != "success":
-            logging.warning(f"[/authorization] faild: Attempt ID{attempt_id} is not success({attempt_state.get("status")})")
+            logger.warning(f"Attempt ID{attempt_id} is not success({attempt_state.get("status")})")
             return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                               status_code=403,
                                               detail="Authentication attempt not successful",
@@ -86,7 +87,7 @@ def get_authorization(response_type:str,
         matching_state = attempt_state.get("state")
         
         if matching_client_id != client_id or matching_redirect_uri != redirect_uri or (state is not None and matching_state != state):
-            logging.warning(f"[/authorization] faild: mismatch request attempt_id")
+            logger.warning(f"Mismatch request attempt_id")
             return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                               status_code=400,
                                               detail="Authorization request parameters mismatch the initial attempt",
@@ -94,15 +95,15 @@ def get_authorization(response_type:str,
             
         s_id = attempt_state.get("s_id")
         if not s_id:
-            logging.warning(f"[/authorization] session missing in successful attempt_state: {attempt_state}")
+            logger.warning(f"Session missing in successful attempt_state: {attempt_state}")
             return redirect_with_oauth2_error(redirect_uri=redirect_uri,
                                               status_code=500,
                                               detail="Internal auth state error: session missing",
                                               state=state)
-        logging.debug(f"attempt_id authentication successful:{attempt_id} and s_id:{s_id}")
+        logger.debug(f"attempt_id authentication successful:{attempt_id} and s_id:{s_id}")
         
         rd.delete(redis_attempt_key)
-        logging.debug(f"Deleted used attempt from Redis:{redis_attempt_key}")
+        logger.debug(f"Deleted used attempt from Redis:{redis_attempt_key}")
     
     # STEP 4. Generating Authorization Code
     authorization_code = str(uuid.uuid4())
@@ -127,7 +128,7 @@ def get_authorization(response_type:str,
     }
     encoded_redirect_params = urlencode({k: v for k, v in redirect_query_params.items() if v is not None})
     redirect_url_with_code = f"{redirect_uri}?{encoded_redirect_params}"
-    logging.info(f"[/authorization] Redirecting Browser to redirect_uri:{redirect_url_with_code}")
+    logger.info(f"Redirecting Browser to redirect_uri:{redirect_url_with_code}")
     
     return RedirectResponse(
         url=redirect_url_with_code,

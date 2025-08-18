@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Date
 from sqlalchemy.orm import relationship
 from core.database import Base
+from models.permission import permission_table
 
 class Employee(Base):
     __tablename__ = "employee"
@@ -14,3 +15,4 @@ class Employee(Base):
     email = Column(String, nullable=False)
     
     pubkeys = relationship("Pubkey", back_populates="employee", cascade="all, delete")
+    services = relationship("Services", secondary=permission_table, back_populates="employees")
