@@ -14,6 +14,8 @@ class Employee(Base):
     birth = Column(Date, nullable=False)
     email = Column(String, nullable=False)
     
+    pubkeys = relationship("Pubkey", back_populates="employee", cascade="all, delete")
+    
     services = relationship(
         "Services",
         secondary=permission_table,
