@@ -7,6 +7,8 @@ on:
     paths:
       - 'onecard-web/**'
       - 'onecard-api/**'
+      # - 'onecard-app/**'
+      # - 'onecard-notification/**'
 
 jobs:
   deploy:
@@ -26,7 +28,15 @@ jobs:
             host_port: 9414
             container_port: 8001
             env_secret: ENV_FILE_API
-    
+          # - name: onecard-app
+          #   path: onecard-app
+          #   host_port: 9415
+          #   container_port: 8002
+          #   env_secret: ENV_FILE_APP
+          # - name: NotificationServer
+          #   path: onecard-notification
+          #   host_port: 9416
+          #   container_port: 9000
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
