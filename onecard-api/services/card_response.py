@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 import json
 import uuid
 import time
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from logging import LoggerAdapter
 from models.pubkey import Pubkey
 from schemas.card import CardDataRequest
@@ -13,54 +17,9 @@ from utils.redis_const import (
     REDIS_PUB_SESSION_MAP_PREFIX,
     REDIS_SESSION_PUB_MAP_PREFIX
 )
-from utils.decrypt import decrypted
 
 rd = redis_config()
 token = Token()
-
-def verify_card_response(data:CardDataRequest, 
-                         challenge:str, 
-                         db:Session,
-                         logger:LoggerAdapter):
-    """
-    Args:
-    - data: CardData
-    - challenge
-    - db: ORM Session
-    Returns:
-    - public_key
-    """
-    try:
-        decrypted = decrypted(data.card_data)
-        public_key = decrypted.get("public key")
-        response = decrypted.get("response")
-        
-        stored_challenge = challenge.upper()
-        
-        # STEP 1. Challenge Validation Check
-        if stored_challenge != response:
-            raise HTTPException(status_code=401,
-                                detail="Invalid Response")
-        logger.debug("Challenge correct match") 
-        
-        # STEP 2. Public key validation
-        attempt_id = data.attempt_id
-        private_key = rd.get(f"{REDIS_AUTH_ATTEMPT_PREFIX}{attempt_id}")
-        if public_key != private_key:
-            pass
-        
-        # STEP 2. Verification of comparison between decrypted public key and public key stored in DB
-        공개키담고있을테이블 = db.query(Pubkey).filter(Pubkey.pubkey == public_key).first()
-        if not 공개키담고있을테이블:
-            logger.warning(f"Pub key not found")
-            raise HTTPException(status_code=404,
-                                detail="Pub key not found")
-        
-        return public_key
-    except Exception as e:
-        logger.error(f"Unexpected Error while Verifying Card Data: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=str(e))
         
 def get_card_response(data:CardDataRequest,
                       db:Session,
@@ -73,91 +32,102 @@ def get_card_response(data:CardDataRequest,
     """
     start_time = time.perf_counter()
     attempt_id = data.attempt_id
-    logger.debug(f"Received raw data: {data.model_dump_json()}")
-    
+    log_extra = {"attempt_id": attempt_id, "client_id": data.client_id}
+    logger.debug(f"Processing card response for attempt_id: {attempt_id}")
+
+    # STEP 1: Check login attempt information in Redis
     redis_attempt_key = f"{REDIS_AUTH_ATTEMPT_PREFIX}{attempt_id}"
     raw_attempt_state = rd.get(redis_attempt_key)
-    attempt_state = None
-    current_ttl = -3
     
+    if not raw_attempt_state:
+        logger.warning("Invalid or Expired attempt_id", extra=log_extra)
+        raise HTTPException(status_code=401,
+                            detail="Invalid or Expired authentication attempt")
+    
+    attempt_state = json.loads(raw_attempt_state.decode('utf-8'))
+    current_ttl = rd.ttl(redis_attempt_key)
+
+    # STEP 2: Check request validation 
+    if attempt_state.get("status") != "pending":
+        log_extra["current_status"] = attempt_state.get('status')
+        logger.warning("Attempt ID not pending", extra=log_extra)
+        raise HTTPException(status_code=400,
+                            detail="Authentication attempt is not pending")
+    
+    if attempt_state.get("client_id") != data.client_id:
+        log_extra.update({"expected": attempt_state.get("client_id"), "received": data.client_id})
+        logger.warning("Client_id mismatch", extra=log_extra)
+        raise HTTPException(status_code=401,
+                            detail="client_id mismatch for this attempt")
+
+    # STEP 3: Lookup employee's public key in DB
+    emp_no = attempt_state.get("emp_no")
+    pubkey_record = db.query(Pubkey).filter(Pubkey.emp_no == emp_no).first()
+    if not pubkey_record:
+        logger.warning(f"Public key not found for emp_no: {emp_no}", extra=log_extra)
+        raise HTTPException(status_code=404,
+                            detail="Public key for this employee not found in DB.")
+    
+    card_pubkey_hex = pubkey_record.pubkey
+
+    # STEP 4: Deriving a shared secret key and decrypting ciphertext
     try:
-        # STEP 1. Check attempt_id validity and status(pending)
-        if not raw_attempt_state:
-            logger.warning("Invalid or Expired attempt_id", extra={"attempt_id": attempt_id})
-            raise HTTPException(status_code=401,
-                                detail="Invalid or Expired authentication attempt")
+        server_private_key_value = int(attempt_state.get("server_private_key"), 16)
+        original_challenge_bytes = bytes.fromhex(attempt_state.get("challenge"))
         
-        attempt_state = json.loads(raw_attempt_state.decode('utf-8'))
-        current_ttl = rd.ttl(redis_attempt_key) 
+        server_private_key = ec.derive_private_key(server_private_key_value, ec.SECP256R1(), default_backend())
+        card_public_key_bytes = bytes.fromhex(card_pubkey_hex)
+        card_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), card_public_key_bytes)
         
-        if attempt_state.get("status") != "pending":
-            logger.warning(f"Attempt ID not pending, current_status:{attempt_state.get('status')}", extra={"attempt_id": attempt_id})
-            raise HTTPException(status_code=400,
-                                detail="Authentication attempt is not pending")
+        shared_secret = server_private_key.exchange(ec.ECDH(), card_public_key)
+        encryption_key = shared_secret[:16]
+
+        # card_data is the challenge value encrypted and sent by the NFC card
+        ciphertext = bytes.fromhex(data.card_data)
         
-        # STEP 2. check client_id validity
-        stored_client_id = attempt_state.get("client_id") 
-        if stored_client_id != data.client_id:
-            logger.warning(f"Client_id mismatch", extra={"attempt_id": attempt_id, "expected": stored_client_id, "received": data.client_id})
-            raise HTTPException(status_code=401,
-                                detail="client_id mismatch for this attempt")
+        cipher = Cipher(algorithms.AES(encryption_key), modes.ECB(), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_padded_data = decryptor.update(ciphertext) + decryptor.finalize()
         
-        stored_attempt_challenge = attempt_state.get("challenge")
-        if not stored_attempt_challenge:
-            logger.error(f"Challenge missing in Redis State", extra={"attempt_id": attempt_id})
-            raise HTTPException(status_code=500,
-                                detail="Internal state error during verification")
-            
-        # STEP 3. NFC data verification and public key decryption
-        decrypted_pub_key = verify_card_response(data=data.card_data, challenge=stored_attempt_challenge, db=db, logger=logger)
-        
-        # STEP 4. Look up a emp_no in Employee? Pubkey? DB using the decrypted public key
-        pubkey_row = db.query(Pubkey).filter(Pubkey.pubkey == decrypted_pub_key).first()
-        if not pubkey_row:
-            logger.warning("NFC auth failed: User not found", extra={"attempt_id": attempt_id, "pub_key": decrypted_pub_key})
-            raise HTTPException(status_code=404,
-                                detail="User Not Found")
-        
-        logger.info(f"NFC authentication successful for pub_key {decrypted_pub_key}", extra={"attempt_id": attempt_id})
-            
-        # STEP 5. Generate internal Session ID in Authentication Server and Save in redis through mapping
-        s_id = str(uuid.uuid4())
-        session_ttl = token.RT_EXPIRE_MINUTES * 60
-        
-        rd.setex(f"{REDIS_SESSION_PUB_MAP_PREFIX}{s_id}",
-                 session_ttl,
-                 decrypted_pub_key)
-        
-        rd.setex(f"{REDIS_PUB_SESSION_MAP_PREFIX}{decrypted_pub_key}",
-                 session_ttl,
-                 s_id)
-        logger.debug(f"Generated Session ID {s_id}", extra={"attempt_id": attempt_id})
-             
-        attempt_state["status"] = "success"
-        attempt_state["s_id"] = s_id
-        
-        if current_ttl > -2:
-            rd.setex(redis_attempt_key, max(current_ttl, 60) if current_ttl > 0 else 60,
-                     json.dumps(attempt_state))
-        else:
-            logger.error(f"Attempt Key unexpectedly expired", extra={"attempt_id": attempt_id})
-            raise HTTPException(status_code=500,
-                                detail="Internal state error during verification")
-        
-        # STEP 7. OSTOOLS에게 성공 응답 반환
-        response_time_ms = (time.perf_counter() - start_time) * 1000
-        logger.info("Card response processed successfully", extra={"attempt_id": attempt_id, "response_time_ms": response_time_ms})
-        
-        return {"message" : "NFC Authentication Successful. Status updated"}
-    except HTTPException as he: 
-        logger.error(f"HTTPException raised: {he.detail}", extra={"attempt_id": attempt_id})
-        raise he
+        unpadder = padding.PKCS7(128).unpadder()
+        decrypted_challenge_bytes = unpadder.update(decrypted_padded_data) + unpadder.finalize()
+
     except Exception as e:
-        logger.error(f"Unexpected error for attempt {attempt_id}, client_id {data.client_id}: {str(e)}", exc_info=True)
-        if attempt_state is not None and current_ttl > -2:
-            attempt_state["status"] = "failed"
-            attempt_state["error"] = "Internal Error"
-            attempt_state["error_description"] = "Unexpecteed server error occured during verification"
-            rd.setex(redis_attempt_key, max(current_ttl, 60) if current_ttl > 0 else 60, json.dumps(attempt_state))
-        
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        logger.error(f"Decryption failed: {e}", extra=log_extra, exc_info=True)
+        raise HTTPException(status_code=500,
+                            detail="Decryption process failed.")
+
+    # STEP 5: Challenge verification
+    if decrypted_challenge_bytes[4:16] != original_challenge_bytes[4:16]:
+        logger.warning("Challenge mismatch", extra=log_extra)
+        raise HTTPException(status_code=401, 
+                            detail="Challenge mismatch. Authentication failed.")
+    
+    logger.info(f"NFC authentication successful for emp_no {emp_no}", extra=log_extra)
+            
+    # STEP 6: Generate internal session ID and store mapping information in Redis
+    s_id = str(uuid.uuid4())
+    session_ttl = token.RT_EXPIRE_MINUTES * 60
+    
+    rd.setex(f"{REDIS_SESSION_PUB_MAP_PREFIX}{s_id}", session_ttl, card_pubkey_hex)
+    rd.setex(f"{REDIS_PUB_SESSION_MAP_PREFIX}{card_pubkey_hex}", session_ttl, s_id)
+    logger.debug(f"Generated Session ID {s_id}", extra=log_extra)
+             
+    # STEP 7: Update the attempt status stored in Redis to 'success'
+    attempt_state["status"] = "success"
+    attempt_state["s_id"] = s_id
+    
+    # Check if the Redis key has not expired and then update it.
+    if current_ttl > -2:
+        rd.setex(redis_attempt_key, max(current_ttl, 60) if current_ttl > 0 else 60,
+                 json.dumps(attempt_state))
+    else:
+        logger.error("Attempt Key unexpectedly expired before status update", extra=log_extra)
+        raise HTTPException(status_code=500,
+                            detail="Internal state error: attempt expired prematurely.")
+    
+    response_time_ms = (time.perf_counter() - start_time) * 1000
+    log_extra["response_time_ms"] = response_time_ms
+    logger.info("Card response processed successfully", extra=log_extra)
+    
+    return {"message": "NFC Authentication Successful. Status updated"}

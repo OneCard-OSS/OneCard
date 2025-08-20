@@ -10,13 +10,11 @@ card_response_router = APIRouter(prefix="/api/v1", tags=["NFC tagging response"]
 
 @card_response_router.post("/card-response")
 def card_response(data:CardDataRequest, 
-                  client_id:str, 
                   db:Session=Depends(get_db)):
     
     logger = getLogger(__name__)
     adapter = EndPointAdapter(logger, {"endpoint":"POST /api/v1/card-response"})
     
-    return get_card_response(data=data, 
-                             client_id=client_id, 
+    return get_card_response(data=data,  
                              db=db,
                              logger=adapter)

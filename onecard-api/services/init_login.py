@@ -8,6 +8,7 @@ from models.employee import Employee
 from utils.redis_const import REDIS_AUTH_ATTEMPT_PREFIX
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from logging import LoggerAdapter
 import time
 import uuid
@@ -44,7 +45,7 @@ async def init_login(emp_no:str,
     ).first()
     
     if not service:
-        log_extra.update({"status": "failed", "error_message": "Not found client_id or redirect_uri"})
+        log_extra = {"client_id": client_id, "emp_no": emp_no, "status": "failed", "error_message": "Not found client_id or redirect_uri"}
         logger.warning("Not found client_id or redirect_uri", extra=log_extra)
         raise HTTPException(status_code=404,
                             detail="Not found client_id or redirect_uri")
@@ -71,28 +72,29 @@ async def init_login(emp_no:str,
     # STEP 1. ECC key pair generate (SECP256R1)
     private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
     public_key = private_key.public_key()
-    public_numbers = public_key.public_numbers()
     
     # STEP 2. Format the public key as 65 bytes (0x04 + x + y)
-    x_bytes = public_numbers.x.to_bytes(32, 'big')
-    y_bytes = public_numbers.y.to_bytes(32,'big')
-    formatted_public_key = b'\x04' + x_bytes + y_bytes
+    server_public_key = public_key.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    )
     
     # STEP 3. Generate a 16 byte random challenge
     challenge = os.urandom(16)
     
-    # STEP 4. Final data to be transmitted
-    final_data = (formatted_public_key + challenge).hex()
+    # STEP 4. Final data to be transmitted (65 bytes + 16 bytes = 81 bytes)
+    final_data = (server_public_key + challenge).hex()
     
     # STEP 5. Store private key and challenge in Redis for later verification
     prviate_key_value = private_key.private_numbers().private_value
     attempt_state = {
         "status" : "pending",
+        "emp_no" : emp_no,
         "client_id" : client_id,
         "redirect_uri" : redirect_uri,
         "state" : state,
         "s_id" : None,
-        "privkey" : hex(prviate_key_value)[2:],
+        "server_private_key" : hex(prviate_key_value)[2:],
         "challenge" : challenge.hex()
     }
     logger.debug(f"Attempt State: {attempt_state}")
