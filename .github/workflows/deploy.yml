@@ -33,7 +33,7 @@ jobs:
             host_port: 9415
             container_port: 8002
             env_secret: ENV_FILE_APP
-          - name: NotificationServer
+          - name: onecard-pushserver
             path: onecard-pushserver
             host_port: 9416
             container_port: 5000
