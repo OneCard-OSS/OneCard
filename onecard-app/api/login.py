@@ -13,11 +13,11 @@ def initiate_login(request:InitiateLoginRequest, db:Session=Depends(get_db)):
     return login(emp_no=request.emp_no, db=db)
 
 @app_login_router.post("/verify")
-def verify_login(request:NfcVerifyRequest):
+def verify_login(request:NfcVerifyRequest, db:Session=Depends(get_db)):
     return verify_nfc(
         attempt_id=request.attempt_id,
-        pubkey_hex=request.pubkey,
-        signature_hex=request.encrypted_data.model_dump()
+        encrypted_challenge=request.encrypted_data,
+        db=db
     )
 
 @app_login_router.post("/token")

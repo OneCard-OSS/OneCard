@@ -45,14 +45,14 @@ def login(emp_no:str, db:Session):
     attempt_id = str(uuid.uuid4())
     
     # STEP 4. Store login request challenge in Redis(valid for 2 minutes)
-    private_key_value = temporary_private_key.private_numbers().private_value()
+    private_key_value = temporary_private_key.private_numbers().private_value
     
     attepmt_state = {
         "emp_no" : emp_no,
         "server_private_key" : hex(private_key_value)[2:],
         "challenge" : challenge.hex()
     }
-    rd.setex(f"{APP_ATTEMPT_PREFIX}", 120, json.dumps(attepmt_state))
+    rd.setex(f"{APP_ATTEMPT_PREFIX}{attempt_id}", 120, json.dumps(attepmt_state))
     final_data = (server_public_key_bytes + challenge).hex()
     
     return {
@@ -94,6 +94,7 @@ def verify_nfc(attempt_id:str,
         raise HTTPException(status_code=404,
                             detail="Public key for this employee not found")
     card_pubkey_hex = pubkey.pubkey
+    print(f"DB에 담겨있는 공개키:{card_pubkey_hex}. 소유자: {expected_emp_no}")
     
     # STEP 3. Deriving a shared secret key and decrypting ciphertext 
     try:
@@ -103,15 +104,15 @@ def verify_nfc(attempt_id:str,
         
         # Generate shared secret 
         shared_secret = server_private_key.exchange(ec.ECDH(), card_public_key)
-        
+
         # The first 128 bits (16 bytes) of the shared secret key are used directly as the encryption key
         encryption_key = shared_secret[:16]
-        
+        print(f"암호화키:{encryption_key}, 길이{len(encryption_key)}")
         # Extract and decrypt the encrypted data sent by the client
         ciphertext = bytes.fromhex(encrypted_challenge)
-        
+        print(f"사이퍼텍스트:{ciphertext}")
         # Generate ciphter object and decryptor 
-        cipher = Cipher(algorithms.AES(encryption_key), modes.ECB, backend=default_backend())
+        cipher = Cipher(algorithms.AES(encryption_key), modes.ECB(), backend=default_backend())
         decryptor = cipher.decryptor()
         
         # Run decryption
@@ -123,7 +124,7 @@ def verify_nfc(attempt_id:str,
         decrypted_challenge_bytes = unpadder.update(decrypted_padded_data) + unpadder.finalize()
         
     except Exception as e:
-        logging.warning(f"Decryption failed for attempt_id:{attempt_id}")
+        logging.warning(f"Decryption failed for attempt_id:{attempt_id}:{e}")
         raise HTTPException(status_code=500,
                             detail="Decryption failed")
     # STEP 4. Verification data: decrypted challenge matches original challenge
@@ -206,7 +207,7 @@ def logout(access_token:str):
     - dict: successful message
     """
     try:
-        payload = token.verify_token(token=token, is_refresh=False)
+        payload = token.verify_token(token=access_token, is_refresh=False)
         emp_no = payload.get("sub")
         if not emp_no:
             raise HTTPException(status_code=401,
