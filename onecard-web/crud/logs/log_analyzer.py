@@ -9,18 +9,30 @@ import re
 
 class LogAnalyzer:
     def __init__(self, log_file_name: str = "api_access_log.jsonl"):
-
+        """
+        LogAnalyzer를 초기화합니다.
+        [수정됨] Docker 환경과 로컬 환경 모두에서 안정적으로 동작하도록 경로 탐색 로지을 변경했습니다.
+        """
         current_path = os.path.dirname(os.path.abspath(__file__))
         project_root = current_path
-
-        while not (os.path.isdir(os.path.join(project_root, 'onecard-api')) or os.path.isdir(os.path.join(project_root, 'onecard-web'))):
+        
+        while not os.path.exists(os.path.join(project_root, 'pyproject.toml')):
             parent_path = os.path.dirname(project_root)
             if parent_path == project_root: 
-                raise FileNotFoundError("Project root could not be determined. Ensure 'onecard-api' or 'onecard-web' directory exists.")
+                if os.path.isdir("/logs"):
+                    self.log_file_path = os.path.join("/logs", log_file_name)
+                    print(f"Project root anchor not found, falling back to Docker log path: {self.log_file_path}")
+                    return
+                raise FileNotFoundError("Project root could not be determined. Could not find 'pyproject.toml'.")
             project_root = parent_path
+            
+        common_root = os.path.dirname(project_root)
+        self.log_file_path = os.path.join(common_root, 'logs', log_file_name)
+        
+        if self.log_file_path.startswith('/logs'):
+             self.log_file_path = os.path.join("/logs", log_file_name)
 
-        self.log_file_path = os.path.join(project_root, 'logs', log_file_name)
-        print(f"Log file path dynamically set to: {self.log_file_path}") 
+        print(f"Log file path dynamically set to: {self.log_file_path}")
     
     def parse_log_file(self) -> List[LogEntry]:
         """JSONL 로그 파일을 파싱하여 LogEntry 객체 리스트로 반환"""
@@ -35,12 +47,12 @@ class LogAnalyzer:
                 for line in file:
                     try:
                         log_data = json.loads(line.strip())
-                       
+                        # timestamp 파싱
                         log_data['timestamp'] = datetime.fromisoformat(log_data['timestamp'])
                         log_entry = LogEntry(**log_data)
                         log_entries.append(log_entry)
                     except (json.JSONDecodeError, ValueError, TypeError) as e:
-                       
+                        # 파싱 실패한 라인은 건너뛰기
                         continue
         except Exception as e:
             print(f"로그 파일 읽기 실패: {e}")
