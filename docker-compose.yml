@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: onecard-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: osa94131!
+      POSTGRES_DB: onecard_db
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: onecard-redis
+    restart: always
+
+  onecard-api:
+    build: ./onecard-api
+    container_name: onecard-api
+    ports:
+      - "9414:8001"
+    env_file:
+      - ./onecard-api/.env
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  onecard-web:
+    build: ./onecard-web
+    container_name: onecard-web
+    ports:
+      - "9413:8000"
+    env_file:
+      - ./onecard-web/.env
+    depends_on:
+      - onecard-api
+    restart: always
+      
+  onecard-pushserver:
+    build: ./onecard-pushserver
+    container_name: onecard-pushserver
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./onecard-pushserver/.env
+    restart: always
+
+volumes:
+  db-data:
