@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인증 대기 중...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg text-center">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">인증 진행 중</h2>
+        <p class="text-gray-600 mb-6">휴대폰으로 전송된 알림을 확인하여 NFC 인증을 완료해주세요.</p>
+        <div class="flex justify-center items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-lg">인증을 기다리는 중...</span>
+        </div>
+        <p id="error-message" class="text-red-500 text-sm mt-4"></p>
+
+        <!-- [수정됨] 이전으로 돌아가기 버튼 추가 -->
+        <div class="mt-6">
+            <button id="back-btn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition">
+                이전으로 돌아가기
+            </button>
+        </div>
+    </div>
+
+<script>
+    // --- FastAPI 라우터에서 전달받는 변수들 ---
+    const attemptId = "{{ attempt_id }}";
+    const clientId = "{{ client_id }}";
+    const redirectUri = "{{ redirect_uri }}";
+    const state = "{{ state }}";
+    const pollingInterval = parseInt("{{ polling_interval }}", 10);
+
+    // --- API 및 리디렉션 URL 구성 ---
+    const statusCheckUrl = `/api/v1/nfc-status/${attemptId}?client_id=${clientId}`;
+    const finalRedirectUrl = `/api/v1/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&attempt_id=${attemptId}`;
+
+    const errorMessageElement = document.getElementById('error-message');
+
+    async function checkStatus() {
+        try {
+            // NFC 상태 확인 API 호출
+            const response = await fetch(statusCheckUrl);
+            if (!response.ok) {
+                // 500 에러 등 통신 실패 시 폴링 중단
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // 성공 시, 폴링을 멈추고 최종 인가 코드 발급을 위해 리디렉션
+                clearInterval(pollingTimer);
+                window.location.href = finalRedirectUrl;
+            } else if (data.status === 'failed' || data.status === 'expired') {
+                // 실패 또는 만료 시, 폴링 중단 및 메시지 표시
+                const description = data.error_description || '시간이 초과되었거나 유효하지 않은 시도입니다.';
+                errorMessageElement.textContent = `인증에 실패했습니다: ${description}`;
+                clearInterval(pollingTimer);
+            }
+            // 'pending' 상태일 경우 아무것도 하지 않고 다음 폴링을 기다림
+
+        } catch (error) {
+            console.error('Error during status polling:', error);
+            errorMessageElement.textContent = '인증 상태를 확인하는 중 오류가 발생했습니다. 이 페이지를 닫고 다시 시도해주세요.';
+            clearInterval(pollingTimer); // 오류 발생 시 폴링 중단
+        }
+    }
+
+    // 페이지 로드 후, 설정된 간격으로 상태 확인 시작
+    const pollingTimer = setInterval(checkStatus, pollingInterval);
+    
+    // 페이지가 로드되자마자 즉시 한 번 실행하여 빠른 피드백 제공
+    checkStatus();
+
+    // [수정됨] 이전으로 돌아가기 버튼 이벤트 리스너 추가
+    document.getElementById('back-btn').addEventListener('click', () => {
+        // 폴링을 멈추고 브라우저의 뒤로가기 기능 실행
+        clearInterval(pollingTimer);
+        window.history.back();
+    });
+</script>
+</body>
+</html>

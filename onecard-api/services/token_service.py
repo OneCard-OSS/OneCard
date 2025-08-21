@@ -5,7 +5,10 @@ from typing import Dict, Any, Optional
 from core.redis import redis_config
 from core.token import Token
 from models.service import Services
+from models.pubkey import Pubkey
+from models.employee import Employee
 from utils.redis_const import REDIS_AUTH_CODE_PREFIX, REDIS_REFRESH_TOKEN_PREFIX, REDIS_SESSION_PUB_MAP_PREFIX, REDIS_PUB_SESSION_MAP_PREFIX
+from utils.get_current_session import get_employee_from_session_id
 import json
 from logging import LoggerAdapter
 
@@ -78,7 +81,20 @@ def handle_token_request(grant_type:str,
                 raise HTTPException(status_code=404,
                                     detail="Session ID not include authorization cde")
             
-            # 1-7. Issue Token
+            # 1-7 Retrieve actual user infornation(emp_no, email, name..) vis s_id
+            pubkey_hex = rd.get(f"{REDIS_SESSION_PUB_MAP_PREFIX}{s_id_for_token}")
+            if not pubkey_hex:
+                raise HTTPException(status_code=500,
+                                    detail="Failed to find user info from session id(s_id)")
+            pubkey = db.query(Pubkey).filter(Pubkey.pubkey == pubkey_hex.decode('utf-8')).first()
+            if not pubkey or not pubkey.emp_no:
+                raise HTTPException(status_code=500, 
+                                    detail="Failed to find user info from pubkey")
+                
+            employee = get_employee_from_session_id(s_id=s_id_for_token, db=db)
+            
+            # 1-8. Issue Token
+            # sub uses internal session ID(s_id)
             access_token = token.create_access_token(data={"sub":s_id_for_token})
             refresh_token = token.create_refresh_token(data={"sub":s_id_for_token})
             
@@ -88,7 +104,17 @@ def handle_token_request(grant_type:str,
             refresh_token_ttl = token.RT_EXPIRE_MINUTES * 60
             rd.setex(refresh_token_redis_key, refresh_token_ttl, refresh_token)
             
-            # 1-9. Session TTL updated
+            # 1-9. ID Token: OIDC standart identity information. The subject uses a persistent user identifier(emp_no)
+            id_token_claims = {
+                "sub" : employee.emp_no,
+                "aud" : client_id,
+                "name" : employee.name,
+                "email" : employee.email
+            }
+            
+            id_token = token.create_id_token(data=id_token_claims)
+            
+            # 1-10. Session TTL updated
             session_key = f"{REDIS_SESSION_PUB_MAP_PREFIX}{s_id_for_token}"
             if rd.exists(session_key):
                 rd.expire(session_key, refresh_token_ttl)
@@ -102,7 +128,8 @@ def handle_token_request(grant_type:str,
                 "access_token" : access_token,
                 "expires_in" : token.AT_EXPIRE_MINUTES * 60,
                 "refresh_token" : refresh_token,
-                "refresh_token_expires_in" : refresh_token_ttl
+                "refresh_token_expires_in" : refresh_token_ttl,
+                "id_token" : id_token
             }
         # STEP 2. Branching logic based on grant_type and validation : refresh token
         elif grant_type == "refresh_token":

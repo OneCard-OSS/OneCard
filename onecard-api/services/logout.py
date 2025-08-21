@@ -8,12 +8,12 @@ def logout_user(s_id:str,
                 access_token:str,
                 logger:LoggerAdapter):
     """
-    Logout Service
+    Blacklist style logout
     Args:
-    - access_token
-    - logger
+    - s_id: User's session ID
+    - access_token: Access token issued to the user
     Returns:
-    - dict
+    - dict: message of success
     """
     logger.debug(f"Received token:{access_token}")
     # STEP 1. Verifying Token and Get session id

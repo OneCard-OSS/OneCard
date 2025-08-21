@@ -13,22 +13,22 @@ import json
 
 rd = redis_config()
 
-def get_authorization(response_type:str,
-                      client_id:str,
-                      redirect_uri:str,
-                      state:Optional[str],
-                      attempt_id:Optional[str],
-                      db:Session,
-                      logger:LoggerAdapter):
+def issue_authorization_code(response_type:str,
+                             client_id:str,
+                             redirect_uri:str,
+                             state:Optional[str],
+                             attempt_id:Optional[str],
+                             db:Session,
+                             logger:LoggerAdapter):
     """
-    
+    The service server passes the authorization code to be called.
     Args:
     - response_type: default "code"
-    - client_id
-    - redirect_uri
-    - state: CSRF
-    - attempt_id
-    - db
+    - client_id: client_id of registered service
+    - redirect_uri: redirect uri of the registered service server to receive the authorization code 
+    - state: random values to prevent CSRF
+    - attempt_id: authentication attempt identification ID
+    - db: ORM Session
     Returns:
     - RedirectResponse: Redirect to the redirect uri with authorization code passed as a parameter
     """

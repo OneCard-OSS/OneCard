@@ -25,10 +25,13 @@ def get_card_response(data:CardDataRequest,
                       db:Session,
                       logger:LoggerAdapter):
     """
+    Verify the data received from the card and decrypt the response value.
+    After verification, the service server creates a session value to be used and changes the attempt status value.
     Args:
-    - data: DTO (card_data:str, attempt_id:str)
-    - client_id
-    - db
+    - data: Data received after verification in the app(card_data, attempt_id, client_id)
+    - db: ORM Session
+    Returns:
+    - dict: message of success
     """
     start_time = time.perf_counter()
     attempt_id = data.attempt_id

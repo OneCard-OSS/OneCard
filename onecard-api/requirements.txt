@@ -82,7 +82,9 @@ cryptography==45.0.6 \
     --hash=sha256:eccddbd986e43014263eda489abbddfbc287af5cddfd690477993dbb31e31016 \
     --hash=sha256:ee411a1b977f40bd075392c80c10b58025ee5c6b47a822a33c1198598a7a5f05 \
     --hash=sha256:f4028f29a9f38a2025abedb2e409973709c660d44319c61762202206ed577c42
-    # via python-jose
+    # via
+    #   onecard-api
+    #   python-jose
 dnspython==2.7.0 \
     --hash=sha256:b4c34b7d10b51bcc3a5071e7b8dee77939f1e878477eeecc965e9835f63c6c86 \
     --hash=sha256:ce9c432eda0dc91cf618a5cedf1a4e142651196bbcd2c80e89ed5a907e5cfaf1
@@ -177,6 +179,10 @@ idna==3.10 \
     #   anyio
     #   email-validator
     #   httpx
+itsdangerous==2.2.0 \
+    --hash=sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef \
+    --hash=sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173
+    # via onecard-api
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67

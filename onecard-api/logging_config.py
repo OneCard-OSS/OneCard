@@ -41,7 +41,7 @@ def setup_logging():
     Set up logs to be written to a file in JSON format 
     """
     log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
-    log_file = "api_access_log"
+    log_file = "api_access_log.jsonl"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     log_path = os.path.join(log_dir, log_file)

@@ -21,7 +21,7 @@ async def init_login(emp_no:str,
                      redirect_uri:str,
                      db:Session,
                      logger:LoggerAdapter,
-                     state:Optional[str]=None,):
+                     state:Optional[str]=None):
     """
     The first login function used by the authentication server.
     Login is performed via an HTML file that responds from the authentication server.
@@ -120,8 +120,4 @@ async def init_login(emp_no:str,
     log_extra["response_time_ms"] = response_time_ms
     logger.info("Login process completed successfully", extra=log_extra)
     
-    return {
-        "status" : 200,
-        "message" : "Data delivered to push server successfully",
-        "pub_data" : attempt_id
-    }
+    return attempt_id

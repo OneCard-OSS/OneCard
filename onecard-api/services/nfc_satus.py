@@ -10,11 +10,14 @@ rd = redis_config()
 def get_nfc_authentication_status(attempt_id:str,
                                   client_id:str):
     """
+    Polls and retireve the current status of NFC authentication attempt
+    Check Redis for a given attempt_id to determine 
+    if NFC authentication is pending, successful, failed, or expired.
     Args:
-    - attempt_id
-    - client_id
+    - attempt_id: unique identifier for login attempt
+    - client_id: client_id of registered service
     Returns:
-    - NfcStatusResponse: 
+    - NfcStatusResponse: pydantic model containig status, error, error_description
     """
     try:
         redis_attempt_key = f"{REDIS_AUTH_ATTEMPT_PREFIX}{attempt_id}"

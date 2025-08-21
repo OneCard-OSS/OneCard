@@ -40,3 +40,18 @@ class Token:
             return payload
         except JWTError as je:
             raise je
+        
+    def create_id_token(self, data:dict, expire_delta:datetime.timedelta=None):
+        to_encode = data.copy()
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if expire_delta:
+            expire = now + expire_delta
+        else:
+            expire = now + datetime.timedelta(minutes=self.AT_EXPIRE_MINUTES)
+        
+        # Added the OIDC standard claim iat(issued at)
+        to_encode.update({"iat": int(now.timestamp())})
+        to_encode.update({"exp": int(expire.timestamp())})
+        
+        return jwt.encode(to_encode, self.ACCESS_SECRET_KEY, algorithm=self.ALGORITHM)
