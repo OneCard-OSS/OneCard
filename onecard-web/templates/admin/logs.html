@@ -1,0 +1,802 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 로그 분석 대시보드 메인 컨텐츠 -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- 헤더 -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">로그 분석 대시보드</h2>
+                    <p class="mt-1 text-sm text-gray-600">API 로그 모니터링 및 분석</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <label for="dayRange" class="text-sm font-medium text-gray-700">분석 기간:</label>
+                        <select id="dayRange" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="1">1일</option>
+                            <option value="3">3일</option>
+                            <option value="7" selected>7일</option>
+                            <option value="14">14일</option>
+                            <option value="30">30일</option>
+                        </select>
+                    </div>
+                    <button onclick="loadDashboardData()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition">
+                        새로고침
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="bg-white p-6 rounded-lg shadow text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p class="mt-4 text-gray-600">로그 데이터를 분석하는 중입니다...</p>
+        </div>
+
+        <div id="dashboardContent" style="display: none;" class="space-y-6">
+            <!-- 주요 통계 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-6 rounded-lg shadow text-center">
+                    <div class="text-2xl font-bold text-blue-500 mb-2" id="totalRequests">0</div>
+                    <div class="text-sm font-medium text-gray-600 uppercase tracking-wider">총 요청 수</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow text-center">
+                    <div class="text-2xl font-bold text-green-500 mb-2" id="successRate">0%</div>
+                    <div class="text-sm font-medium text-gray-600 uppercase tracking-wider">성공률</div>
+                </div>
+            
+            <!-- 차트 영역 -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">시간별 요청량</h3>
+                <div id="hourlyChart" style="height: 400px;"></div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">에러 유형 분석</h3>
+                <div id="errorTypeChart" style="height: 350px;"></div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">주요 엔드포인트</h3>
+                <div id="endpointChart" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사이드바 -->
+    <div class="space-y-6">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">추가 통계</h3>
+            <div class="space-y-4">
+                <div class="text-center">
+                    <div class="text-xl font-bold text-red-500 mb-1" id="errorCount">0</div>
+                    <div class="text-sm text-gray-600">에러 수</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xl font-bold text-yellow-500 mb-1" id="avgResponseTime">0ms</div>
+                    <div class="text-sm text-gray-600">평균 응답시간</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">상태 분포</h3>
+            <div id="statusChart" style="height: 300px;"></div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">서비스 사용량</h3>
+            <div id="serviceChart" style="height: 300px;"></div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">일별 요청 추이</h3>
+            <div id="dailyChart" style="height: 300px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 최근 에러 로그 -->
+<div class="mt-6 bg-white p-6 rounded-lg shadow">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">최근 에러 로그</h3>
+    <div id="recentErrors" class="space-y-3"></div>
+</div>
+
+<script>
+    // Google Charts 로드
+    google.charts.load('current', {
+        'packages': ['corechart', 'bar', 'line'],
+        'language': 'ko'
+    });
+
+    let dashboardData = null;
+
+    // 페이지 로드 시 초기 데이터 로드
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardData();
+        
+        // 기간 변경 이벤트
+        document.getElementById('dayRange').addEventListener('change', function() {
+            loadDashboardData();
+        });
+    });
+
+    async function loadDashboardData() {
+        const days = document.getElementById('dayRange').value;
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const dashboardContent = document.getElementById('dashboardContent');
+        
+        loadingIndicator.style.display = 'block';
+        dashboardContent.style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/v1/logs/dashboard-data?days=${days}`);
+            if (!response.ok) {
+                throw new Error('데이터를 불러올 수 없습니다.');
+            }
+            
+            dashboardData = await response.json();
+            updateDashboard(dashboardData);
+            
+            loadingIndicator.style.display = 'none';
+            dashboardContent.style.display = 'block';
+            
+        } catch (error) {
+            console.error('대시보드 데이터 로드 실패:', error);
+            loadingIndicator.innerHTML = `
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    <strong>오류:</strong> 데이터를 불러오는데 실패했습니다: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    function updateDashboard(data) {
+        // 주요 통계 업데이트
+        const summary = data.summary;
+        const analysis = data.analysis;
+        
+        document.getElementById('totalRequests').textContent = summary.total_requests.toLocaleString();
+        document.getElementById('successRate').textContent = summary.success_rate + '%';
+        document.getElementById('errorCount').textContent = summary.error_count.toLocaleString();
+        document.getElementById('avgResponseTime').textContent = 
+            summary.average_response_time ? summary.average_response_time + 'ms' : 'N/A';
+
+        // 차트 그리기
+        drawHourlyChart(analysis.statistics.hourly_requests);
+        drawStatusChart(analysis.statistics.status_distribution);
+        drawErrorTypeChart(data.error_trends.error_types);
+        drawServiceChart(analysis.statistics.service_usage);
+        drawEndpointChart(analysis.statistics.top_endpoints);
+        drawDailyChart(analysis.statistics.daily_requests);
+        displayRecentErrors(analysis.recent_errors);
+    }
+
+    function drawHourlyChart(hourlyData) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '시간');
+        data.addColumn('number', '요청 수');
+
+        hourlyData.forEach(item => {
+            const time = new Date(item.hour).toLocaleDateString('ko-KR', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit'
+            });
+            data.addRow([time, item.count]);
+        });
+
+        const options = {
+            hAxis: { title: '시간' },
+            vAxis: { title: '요청 수' },
+            colors: ['#3b82f6'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '85%', height: '70%' },
+            legend: { position: 'none' }
+        };
+
+        const chart = new google.visualization.AreaChart(document.getElementById('hourlyChart'));
+        chart.draw(data, options);
+    }
+
+    function drawStatusChart(statusData) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '상태');
+        data.addColumn('number', '개수');
+
+        Object.entries(statusData).forEach(([status, count]) => {
+            data.addRow([status || 'Unknown', count]);
+        });
+
+        const options = {
+            colors: ['#10b981', '#ef4444', '#f59e0b', '#06b6d4'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '85%', height: '75%' },
+            legend: { position: 'bottom' }
+        };
+
+        const chart = new google.visualization.PieChart(document.getElementById('statusChart'));
+        chart.draw(data, options);
+    }
+
+    function drawErrorTypeChart(errorTypes) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '에러 유형');
+        data.addColumn('number', '발생 횟수');
+
+        Object.entries(errorTypes).forEach(([type, count]) => {
+            data.addRow([type, count]);
+        });
+
+        const options = {
+            colors: ['#ef4444', '#f97316', '#f59e0b', '#8b5cf6', '#ec4899'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '75%', height: '75%' },
+            legend: { position: 'none' }
+        };
+
+        const chart = new google.visualization.ColumnChart(document.getElementById('errorTypeChart'));
+        chart.draw(data, options);
+    }
+
+    function drawServiceChart(serviceData) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '서비스');
+        data.addColumn('number', '사용 횟수');
+
+        Object.entries(serviceData).forEach(([service, count]) => {
+            data.addRow([service || 'Unknown', count]);
+        });
+
+        const options = {
+            colors: ['#06b6d4', '#8b5cf6', '#f97316'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '85%', height: '75%' },
+            legend: { position: 'bottom' }
+        };
+
+        const chart = new google.visualization.PieChart(document.getElementById('serviceChart'));
+        chart.draw(data, options);
+    }
+
+    function drawEndpointChart(endpointData) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '엔드포인트');
+        data.addColumn('number', '요청 수');
+
+        endpointData.slice(0, 8).forEach(item => {
+            const endpoint = item.endpoint.length > 30 
+                ? item.endpoint.substring(0, 30) + '...' 
+                : item.endpoint;
+            data.addRow([endpoint, item.count]);
+        });
+
+        const options = {
+            colors: ['#8b5cf6'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '75%', height: '75%' },
+            hAxis: { textPosition: 'none' },
+            legend: { position: 'none' }
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById('endpointChart'));
+        chart.draw(data, options);
+    }
+
+    function drawDailyChart(dailyData) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', '날짜');
+        data.addColumn('number', '요청 수');
+
+        dailyData.forEach(item => {
+            const date = new Date(item.date).toLocaleDateString('ko-KR', {
+                month: 'short',
+                day: 'numeric'
+            });
+            data.addRow([date, item.count]);
+        });
+
+        const options = {
+            colors: ['#06b6d4'],
+            backgroundColor: 'transparent',
+            chartArea: { width: '85%', height: '75%' },
+            legend: { position: 'none' }
+        };
+
+        const chart = new google.visualization.LineChart(document.getElementById('dailyChart'));
+        chart.draw(data, options);
+    }
+
+    function displayRecentErrors(errors) {
+        const container = document.getElementById('recentErrors');
+        
+        if (!errors || errors.length === 0) {
+            container.innerHTML = '<div class="text-gray-500 text-center py-8">최근 에러가 없습니다.</div>';
+            return;
+        }
+
+        let html = '';
+        errors.forEach(error => {
+            const timestamp = new Date(error.timestamp).toLocaleString('ko-KR');
+            html += `
+                <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+                    <div class="text-sm text-gray-600 mb-2">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        ${timestamp}
+                    </div>
+                    <div class="font-medium text-gray-900 mb-2">${error.message}</div>
+                    <div class="text-sm text-gray-600">
+                        <span class="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded mr-2">${error.level}</span>
+                        ${error.endpoint ? `<span class="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded mr-2">${error.endpoint}</span>` : ''}
+                        ${error.service_name ? `<span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded mr-2">${error.service_name}</span>` : ''}
+                        ${error.emp_no ? `<small class="text-gray-500">직원번호: ${error.emp_no}</small>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+
+    // 창 크기 변경시 차트 재그리기
+    window.addEventListener('resize', function() {
+        if (dashboardData) {
+            setTimeout(() => updateDashboard(dashboardData), 100);
+        }
+    });
+</script>
+{% endblock %}
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+        
+        .error-item {
+            border-left: 4px solid #dc3545;
+            background: #fff5f5;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .error-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        
+        .error-message {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .error-details {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-chart-line"></i> OneCard 로그 분석 대시보드</h1>
+                    <p class="mb-0">실시간 API 로그 모니터링 및 분석</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex align-items-center justify-content-end">
+                        <label for="dayRange" class="form-label me-2 mb-0">분석 기간:</label>
+                        <select id="dayRange" class="form-select" style="width: auto;">
+                            <option value="1">1일</option>
+                            <option value="3">3일</option>
+                            <option value="7" selected>7일</option>
+                            <option value="14">14일</option>
+                            <option value="30">30일</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="loadingIndicator" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">로딩중...</span>
+            </div>
+            <p class="mt-3">로그 데이터를 분석하는 중입니다...</p>
+        </div>
+
+        <div id="dashboardContent" style="display: none;">
+            <!-- 주요 통계 카드 -->
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-card text-center">
+                        <div class="stat-number info" id="totalRequests">0</div>
+                        <div class="stat-label">총 요청 수</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center">
+                        <div class="stat-number success" id="successRate">0%</div>
+                        <div class="stat-label">성공률</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center">
+                        <div class="stat-number error" id="errorCount">0</div>
+                        <div class="stat-label">에러 수</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center">
+                        <div class="stat-number warning" id="avgResponseTime">0ms</div>
+                        <div class="stat-label">평균 응답시간</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 차트 영역 -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-chart-area"></i> 시간별 요청량</h3>
+                        <div id="hourlyChart" style="height: 400px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-chart-pie"></i> 상태 분포</h3>
+                        <div id="statusChart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-exclamation-triangle"></i> 에러 유형 분석</h3>
+                        <div id="errorTypeChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-server"></i> 서비스 사용량</h3>
+                        <div id="serviceChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-list"></i> 주요 엔드포인트</h3>
+                        <div id="endpointChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-calendar-day"></i> 일별 요청 추이</h3>
+                        <div id="dailyChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 최근 에러 로그 -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="chart-container">
+                        <h3 class="chart-title"><i class="fas fa-bug"></i> 최근 에러 로그</h3>
+                        <div id="recentErrors"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새로고침 버튼 -->
+    <button class="btn btn-primary btn-lg refresh-btn" onclick="loadDashboardData()">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Google Charts 로드
+        google.charts.load('current', {
+            'packages': ['corechart', 'bar', 'line'],
+            'language': 'ko'
+        });
+
+        // 페이지 로드 시 초기 데이터 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            
+            // 기간 변경 이벤트
+            document.getElementById('dayRange').addEventListener('change', function() {
+                loadDashboardData();
+            });
+        });
+
+        async function loadDashboardData() {
+            const days = document.getElementById('dayRange').value;
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const dashboardContent = document.getElementById('dashboardContent');
+            
+            loadingIndicator.style.display = 'block';
+            dashboardContent.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/v1/logs/dashboard-data?days=${days}`);
+                if (!response.ok) {
+                    throw new Error('데이터를 불러올 수 없습니다.');
+                }
+                
+                dashboardData = await response.json();
+                updateDashboard(dashboardData);
+                
+                loadingIndicator.style.display = 'none';
+                dashboardContent.style.display = 'block';
+                
+            } catch (error) {
+                console.error('대시보드 데이터 로드 실패:', error);
+                loadingIndicator.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        데이터를 불러오는데 실패했습니다: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function updateDashboard(data) {
+            // 주요 통계 업데이트
+            const summary = data.summary;
+            const analysis = data.analysis;
+            
+            document.getElementById('totalRequests').textContent = summary.total_requests.toLocaleString();
+            document.getElementById('successRate').textContent = summary.success_rate + '%';
+            document.getElementById('errorCount').textContent = summary.error_count.toLocaleString();
+            document.getElementById('avgResponseTime').textContent = 
+                summary.average_response_time ? summary.average_response_time + 'ms' : 'N/A';
+
+            // 차트 그리기
+            drawHourlyChart(analysis.statistics.hourly_requests);
+            drawStatusChart(analysis.statistics.status_distribution);
+            drawErrorTypeChart(data.error_trends.error_types);
+            drawServiceChart(analysis.statistics.service_usage);
+            drawEndpointChart(analysis.statistics.top_endpoints);
+            drawDailyChart(analysis.statistics.daily_requests);
+            displayRecentErrors(analysis.recent_errors);
+        }
+
+        function drawHourlyChart(hourlyData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '시간');
+            data.addColumn('number', '요청 수');
+
+            hourlyData.forEach(item => {
+                const time = new Date(item.hour).toLocaleDateString('ko-KR', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit'
+                });
+                data.addRow([time, item.count]);
+            });
+
+            const options = {
+                title: '시간별 API 요청량',
+                hAxis: { title: '시간' },
+                vAxis: { title: '요청 수' },
+                colors: ['#4285f4'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '85%', height: '70%' }
+            };
+
+            const chart = new google.visualization.AreaChart(document.getElementById('hourlyChart'));
+            chart.draw(data, options);
+        }
+
+        function drawStatusChart(statusData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '상태');
+            data.addColumn('number', '개수');
+
+            Object.entries(statusData).forEach(([status, count]) => {
+                data.addRow([status || 'Unknown', count]);
+            });
+
+            const options = {
+                title: '요청 상태 분포',
+                colors: ['#28a745', '#dc3545', '#ffc107', '#17a2b8'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '85%', height: '75%' }
+            };
+
+            const chart = new google.visualization.PieChart(document.getElementById('statusChart'));
+            chart.draw(data, options);
+        }
+
+        function drawErrorTypeChart(errorTypes) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '에러 유형');
+            data.addColumn('number', '발생 횟수');
+
+            Object.entries(errorTypes).forEach(([type, count]) => {
+                data.addRow([type, count]);
+            });
+
+            const options = {
+                title: '에러 유형별 분석',
+                colors: ['#dc3545', '#fd7e14', '#ffc107', '#6610f2', '#e83e8c'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '85%', height: '75%' }
+            };
+
+            const chart = new google.visualization.ColumnChart(document.getElementById('errorTypeChart'));
+            chart.draw(data, options);
+        }
+
+        function drawServiceChart(serviceData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '서비스');
+            data.addColumn('number', '사용 횟수');
+
+            Object.entries(serviceData).forEach(([service, count]) => {
+                data.addRow([service || 'Unknown', count]);
+            });
+
+            const options = {
+                title: '서비스별 사용량',
+                colors: ['#20c997', '#6f42c1', '#fd7e14'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '85%', height: '75%' }
+            };
+
+            const chart = new google.visualization.PieChart(document.getElementById('serviceChart'));
+            chart.draw(data, options);
+        }
+
+        function drawEndpointChart(endpointData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '엔드포인트');
+            data.addColumn('number', '요청 수');
+
+            endpointData.slice(0, 8).forEach(item => {
+                const endpoint = item.endpoint.length > 30 
+                    ? item.endpoint.substring(0, 30) + '...' 
+                    : item.endpoint;
+                data.addRow([endpoint, item.count]);
+            });
+
+            const options = {
+                title: '주요 API 엔드포인트',
+                colors: ['#6610f2'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '75%', height: '75%' },
+                hAxis: { textPosition: 'none' }
+            };
+
+            const chart = new google.visualization.BarChart(document.getElementById('endpointChart'));
+            chart.draw(data, options);
+        }
+
+        function drawDailyChart(dailyData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', '날짜');
+            data.addColumn('number', '요청 수');
+
+            dailyData.forEach(item => {
+                const date = new Date(item.date).toLocaleDateString('ko-KR', {
+                    month: 'short',
+                    day: 'numeric'
+                });
+                data.addRow([date, item.count]);
+            });
+
+            const options = {
+                title: '일별 요청 추이',
+                colors: ['#20c997'],
+                backgroundColor: 'transparent',
+                chartArea: { width: '85%', height: '75%' }
+            };
+
+            const chart = new google.visualization.LineChart(document.getElementById('dailyChart'));
+            chart.draw(data, options);
+        }
+
+        function displayRecentErrors(errors) {
+            const container = document.getElementById('recentErrors');
+            
+            if (!errors || errors.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center">최근 에러가 없습니다.</div>';
+                return;
+            }
+
+            let html = '';
+            errors.forEach(error => {
+                const timestamp = new Date(error.timestamp).toLocaleString('ko-KR');
+                html += `
+                    <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+                        <div class="text-sm text-gray-600 mb-2">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            ${timestamp}
+                        </div>
+                        <div class="font-medium text-gray-900 mb-2">${error.message}</div>
+                        <div class="text-sm text-gray-600">
+                            <span class="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded mr-2">${error.level}</span>
+                            ${error.endpoint ? `<span class="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded mr-2">${error.endpoint}</span>` : ''}
+                            ${error.service_name ? `<span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded mr-2">${error.service_name}</span>` : ''}
+                            ${error.emp_no ? `<small class="text-gray-500">직원번호: ${error.emp_no}</small>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 창 크기 변경시 차트 재그리기
+        window.addEventListener('resize', function() {
+            if (dashboardData) {
+                setTimeout(() => updateDashboard(dashboardData), 100);
+            }
+        });
+    </script>
+</body>
+</html>
