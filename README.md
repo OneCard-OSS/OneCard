@@ -12,18 +12,18 @@ OneCard 프로젝트의 전체 시스템을 로컬 또는 서버 환경에 설�
     Docker Compose: 여러 개의 Docker 컨테이너를 정의하고 한 번에 실행하기 위해 필요합니다.
 
 ### 설치 절차
-1. 프로젝트 소스 코드 복제 (Clone)
+**1. 프로젝트 소스 코드 복제 (Clone)**
 
 가장 먼저, Git을 사용하여 프로젝트의 전체 소스 코드를 내려받습니다.
 
 git clone <프로젝트_저장소_URL>
 cd onecard
 
-2. 환경 변수 설정
+**2. 환경 변수 설정**
 
 각 서비스는 동작에 필요한 민감한 정보나 설정값들을 .env 파일로부터 읽어옵니다. 프로젝트의 최상위 디렉토리(onecard)에 다음 docker-compose.yml 파일을 생성하고, 각 서비스 디렉토리 내에 .env 파일을 생성하여 내용을 채워야 합니다.
 
-2-2. onecard-api/.env 파일 생성
+**2-2. onecard-api/.env 파일 생성**
 
 onecard-api 디렉토리 안에 .env 파일을 생성하고 아래 내용을 채워넣으세요. (주의: SECRET KEY들은 반드시 강력한 랜덤 값으로 변경하세요!)
 
@@ -48,7 +48,7 @@ RT_EXPIRE_MINUTES=129600 # 90일
 FastAPI 세션 미들웨어용 비밀 키
 SECRET_KEY=your_super_strong_session_secret_key
 
-2-3. onecard-web/.env 파일 생성
+**2-3. onecard-web/.env 파일 생성**
 
 onecard-web 디렉토리 안에 .env 파일을 생성하고 아래 내용을 채워넣으세요.
 
@@ -58,10 +58,11 @@ SECRET_KEY=another_strong_session_secret_key
 인증 서버 주소 (onecard-api 컨테이너가 사용하는 포트)
 AUTH_SERVER_URL=http://onecard-api:8001
 
-2-4. onecard-pushserver/.env 파일 생성
+**2-4. onecard-pushserver/.env 파일 생성**
 
 onecard-pushserver 디렉토리 안에 .env 파일을 생성하고 필요한 환경 변수를 추가합니다. (예: PORT=5000)
-3. Docker Compose로 전체 시스템 실행
+
+**3. Docker Compose로 전체 시스템 실행**
 
 모든 .env 파일 설정이 완료되었으면, 프로젝트 최상위 디렉토리 (/home/woojinshin/oss/onecard)에서 아래 명령어를 실행하여 모든 서비스를 빌드하고 실행합니다.
 
